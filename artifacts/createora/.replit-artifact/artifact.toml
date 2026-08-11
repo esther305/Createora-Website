@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Createora"
+description = "A responsive marketing website for Createora, an AI content creation platform that helps teams turn ideas into polished visual and written content faster."
+version = "1.0.0"
+id = "artifacts/createora"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25819
+
+[services.development]
+run = "pnpm --filter @workspace/createora run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/createora", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/createora/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25819"
+BASE_PATH = "/"
