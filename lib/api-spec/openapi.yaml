@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: profile
+    description: Authenticated workspace profile operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [profile]
+      summary: Get the authenticated workspace profile
+      responses:
+        "200":
+          description: Workspace profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          description: Authentication required
 components:
   schemas:
     HealthStatus:
@@ -33,4 +49,25 @@ components:
           type: string
       required:
         - status
+    Profile:
+      type: object
+      properties:
+        clerkUserId:
+          type: string
+        plan:
+          type: string
+        credits:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - clerkUserId
+        - plan
+        - credits
+        - createdAt
+        - updatedAt
 

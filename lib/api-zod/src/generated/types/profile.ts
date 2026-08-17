@@ -6,5 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export * from './healthStatus';
-export * from './profile';
+export interface Profile {
+  clerkUserId: string;
+  plan: string;
+  credits: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
