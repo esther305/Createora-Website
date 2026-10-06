@@ -684,3 +684,5 @@ function App() {
     </WouterRouter>
   );
 }
+
+export default App;
