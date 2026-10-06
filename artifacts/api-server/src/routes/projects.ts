@@ -42,6 +42,7 @@ router.post("/projects", async (req, res) => {
   const width = Number.isInteger(req.body?.width) ? req.body.width : 1080;
   const height = Number.isInteger(req.body?.height) ? req.body.height : 1080;
   const duration = Number.isInteger(req.body?.duration) ? req.body.duration : null;
+  const document = req.body?.document && typeof req.body.document === "object" ? req.body.document : { version: 1, elements: [] };
 
   if (!name || name.length > 120) {
     res.status(400).json({ error: "Project name must be between 1 and 120 characters" });
@@ -68,6 +69,7 @@ router.post("/projects", async (req, res) => {
         width,
         height,
         duration,
+        document,
       })
       .returning();
 
@@ -75,6 +77,31 @@ router.post("/projects", async (req, res) => {
   } catch (error) {
     req.log.error({ err: error, userId }, "Failed to create project");
     res.status(500).json({ error: "Unable to create project" });
+  }
+});
+
+router.patch("/projects/:id", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const document = req.body?.document;
+  if (!document || typeof document !== "object") {
+    res.status(400).json({ error: "A project document is required" });
+    return;
+  }
+
+  try {
+    const [project] = await db
+      .update(projectsTable)
+      .set({ document, updatedAt: new Date() })
+      .where(and(eq(projectsTable.id, req.params.id), eq(projectsTable.clerkUserId, userId)))
+      .returning();
+
+    if (!project) { res.status(404).json({ error: "Project not found" }); return; }
+    res.json({ project });
+  } catch (error) {
+    req.log.error({ err: error, userId }, "Failed to save project");
+    res.status(500).json({ error: "Unable to save project" });
   }
 });
 
