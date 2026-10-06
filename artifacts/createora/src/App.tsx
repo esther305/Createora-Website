@@ -42,6 +42,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import ProjectsPage from '@/pages/projects';
+import ProjectWorkspacePage from '@/pages/project-workspace';
 import { Redirect, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 
 const queryClient = new QueryClient();
@@ -594,6 +595,7 @@ function AppRoutes() {
         <Route path="/sign-up/*?" component={SignUpPage} />
         <Route path="/forgot-password" component={ForgotPasswordPage} />
         <Route path="/dashboard" component={DashboardPage} />
+        <Route path="/projects/:id" component={ProjectWorkspacePage} />
         <Route path="/projects" component={ProjectsPage} />
         <Route component={NotFound} />
       </Switch>
