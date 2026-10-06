@@ -1,4 +1,6 @@
-import { db, aiGenerationsTable } from "@workspace/db";
+import { db, aiGenerationsTable, assetsTable } from "@workspace/db";
+import { eq, desc } from "drizzle-orm";
+import { put } from "@vercel/blob";
 import { Router, type IRouter } from "express";
 import { getAuth } from "@clerk/express";
 import { InferenceClient } from "@huggingface/inference";
@@ -88,6 +90,66 @@ const generateWithGemini = async (
     image: `data:${mimeType};base64,${imagePart.inlineData.data}`,
     provider: "gemini",
     model,
+  };
+};
+
+const persistGeneratedImage = async (
+  userId: string,
+  image: string,
+  provider: string,
+  model: string,
+  prompt: string,
+  aspectRatio: string,
+) => {
+  const match = image.match(/^data:([^;]+);base64,(.+)$/s);
+  if (!match) {
+    throw new Error("Generated image is not in a storable format.");
+  }
+
+  const mimeType = match[1] || "image/png";
+  const buffer = Buffer.from(match[2], "base64");
+  const { width, height } = getAspectDimensions(aspectRatio);
+  const extension =
+    mimeType === "image/jpeg"
+      ? "jpg"
+      : mimeType === "image/webp"
+        ? "webp"
+        : "png";
+
+  const blob = await put(
+    `users/${userId}/ai/${crypto.randomUUID()}.${extension}`,
+    buffer,
+    {
+      access: "public",
+      contentType: mimeType,
+      addRandomSuffix: true,
+      cacheControlMaxAge: 31536000,
+    },
+  );
+
+  const assetId = crypto.randomUUID();
+
+  await db.insert(assetsTable).values({
+    id: assetId,
+    clerkUserId: userId,
+    name: `AI ${provider} · ${prompt.slice(0, 70)}`,
+    type: "image",
+    mimeType,
+    url: blob.url,
+    storageKey: blob.pathname,
+    source: "ai",
+    width,
+    height,
+    size: buffer.byteLength,
+  });
+
+  return {
+    assetId,
+    url: blob.url,
+    mimeType,
+    width,
+    height,
+    size: buffer.byteLength,
   };
 };
 
@@ -208,22 +270,38 @@ router.post("/ai/images/generate", async (req, res) => {
         "AI image generated successfully",
       );
 
+      const asset = await persistGeneratedImage(
+        userId,
+        result.image,
+        result.provider,
+        result.model,
+        prompt,
+        aspectRatio,
+      );
+
       await db.insert(aiGenerationsTable).values({
         id: crypto.randomUUID(),
+        clerkUserId: userId,
+        assetId: asset.assetId,
+        outputUrl: asset.url,
         clerkUserId: userId,
         type: "image",
         provider: result.provider,
         model: result.model,
         prompt,
         aspectRatio,
+        width: asset.width,
+        height: asset.height,
         status: "completed",
         metadata: {
-          temporary: true,
+          temporary: false,
         },
       });
 
       res.json({
         ...result,
+        image: asset.url,
+        assetId: asset.assetId,
         aspectRatio,
       });
 
@@ -270,22 +348,38 @@ router.post("/ai/images/generate", async (req, res) => {
         "AI image generated successfully with Hugging Face",
       );
 
+      const asset = await persistGeneratedImage(
+        userId,
+        result.image,
+        result.provider,
+        result.model,
+        prompt,
+        aspectRatio,
+      );
+
       await db.insert(aiGenerationsTable).values({
         id: crypto.randomUUID(),
+        clerkUserId: userId,
+        assetId: asset.assetId,
+        outputUrl: asset.url,
         clerkUserId: userId,
         type: "image",
         provider: result.provider,
         model: result.model,
         prompt,
         aspectRatio,
+        width: asset.width,
+        height: asset.height,
         status: "completed",
         metadata: {
-          temporary: true,
+          temporary: false,
         },
       });
 
       res.json({
         ...result,
+        image: asset.url,
+        assetId: asset.assetId,
         aspectRatio,
       });
 
