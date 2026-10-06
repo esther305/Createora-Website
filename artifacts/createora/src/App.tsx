@@ -874,18 +874,64 @@ function CreateoraEditor() {
     rotation: 0, color: '#2f9e64'
   });
 
-  const onUpload = (event: ChangeEvent<HTMLInputElement>) => {
+  const onUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      addElement({
-        id: crypto.randomUUID(), type: 'image', x: 180, y: 140, width: 420, height: 300,
-        rotation: 0, src: String(reader.result)
+
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Your session expired. Please sign in again.');
+
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').slice(-120);
+      const pathname = `users/${user?.id ?? 'unknown'}/${crypto.randomUUID()}-${safeName}`;
+      const blob = await upload(pathname, file, {
+        access: 'public',
+        handleUploadUrl: '/api/assets/upload',
+        contentType: file.type,
       });
-    };
-    reader.readAsDataURL(file);
-    event.target.value = '';
+
+      const image = new Image();
+      image.src = blob.url;
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error('Unable to read uploaded image'));
+      });
+
+      const finalize = await fetch('/api/assets/finalize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          pathname: blob.pathname,
+          url: blob.url,
+          name: file.name,
+          contentType: file.type,
+          size: file.size,
+          width: image.naturalWidth || null,
+          height: image.naturalHeight || null,
+        }),
+      });
+
+      const data = await finalize.json();
+      if (!finalize.ok) throw new Error(data.error || 'Unable to save uploaded image');
+
+      addElement({
+        id: crypto.randomUUID(),
+        type: 'image',
+        x: 180,
+        y: 140,
+        width: 420,
+        height: 300,
+        rotation: 0,
+        src: data.asset.url,
+      });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Unable to upload image');
+    } finally {
+      event.target.value = '';
+    }
   };
 
   const updateSelected = (patch: Partial<EditorElement>) => {
@@ -976,7 +1022,7 @@ function CreateoraEditor() {
           <button className={tool === 'text' ? 'active' : ''} onClick={() => addText()}><Type size={19} /><span>Text</span></button>
           <button className={tool === 'shape' ? 'active' : ''} onClick={() => addShape()}><Square size={19} /><span>Shape</span></button>
           <button onClick={() => fileRef.current?.click()}><Upload size={19} /><span>Upload</span></button>
-          <button><ImagePlus size={19} /><span>Media</span></button>
+          <button onClick={() => setLocation('/assets')}><ImagePlus size={19} /><span>Media</span></button>
           <button className={tool === 'ai' ? 'active' : ''} onClick={() => { setTool('ai'); setSelectedId(null); }}><Sparkles size={19} /><span>AI</span></button>
           <div className="editor-tool-spacer" />
           <button><Grid2X2 size={18} /><span>Layers</span></button>
