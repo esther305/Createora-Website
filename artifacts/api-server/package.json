@@ -12,6 +12,7 @@
   "dependencies": {
     "@clerk/express": "^2.1.54",
     "@clerk/shared": "^4.28.1",
+    "@huggingface/inference": "4.13.30",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
     "cookie-parser": "^1.4.7",

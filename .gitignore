@@ -47,3 +47,10 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local environment secrets
+.env
+.env.*
+!.env.example
+artifacts/api-server/.env
+artifacts/createora/.env.local
