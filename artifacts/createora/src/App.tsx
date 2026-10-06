@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type ChangeEvent, type PointerEvent } from 'react';
+import { upload } from '@vercel/blob/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useSignIn, useUser } from '@clerk/react';
 import { shadcn } from '@clerk/themes';
@@ -540,7 +541,7 @@ function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
           <a
             className={`studio-nav-item ${index === 0 ? 'active' : ''}`}
             key={item.label}
-            href={index === 0 ? '#top' : `#${item.label.toLowerCase()}`}
+            href={item.label === 'Assets' ? '/assets' : index === 0 ? '#top' : `#${item.label.toLowerCase()}`}
             data-testid={`link-dashboard-${item.label.toLowerCase()}`}
           >
             {item.icon}<span>{item.label}</span>
@@ -1097,6 +1098,47 @@ function CreateoraEditor() {
   );
 }
 
+type MediaAsset = { id: string; clerkUserId: string; name: string; type: string; mimeType: string | null; url: string; thumbnailUrl: string | null; storageKey: string | null; source: string; width: number | null; height: number | null; duration: number | null; size: number | null; createdAt: string; };
+const formatAssetBytes = (bytes: number | null) => { if (!bytes) return '—'; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`; if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`; return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`; };
+const formatAssetDuration = (seconds: number | null) => { if (!seconds) return ''; const minutes = Math.floor(seconds / 60); const remainder = Math.floor(seconds % 60).toString().padStart(2, '0'); return `${minutes}:${remainder}`; };
+function MediaLibraryPage() {
+  const { isLoaded, isSignedIn, user, getToken } = useAuth();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [assets, setAssets] = useState<MediaAsset[]>([]);
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState('');
+  const loadAssets = async () => { if (!user) return; setLoading(true); setError(''); try { const token = await getToken(); const params = new URLSearchParams(); if (filter !== 'all') params.set('type', filter); if (search.trim()) params.set('search', search.trim()); const response = await fetch(`/api/assets?${params.toString()}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to load media library'); setAssets(data.assets ?? []); } catch (err) { setError(err instanceof Error ? err.message : 'Unable to load media library'); } finally { setLoading(false); } };
+  useEffect(() => { if (isSignedIn) void loadAssets(); }, [isSignedIn, filter, search]);
+  const getMediaMetadata = async (file: File) => {
+    if (file.type.startsWith('image/')) { const url = URL.createObjectURL(file); try { const image = new Image(); image.src = url; await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('Unable to read image metadata')); }); return { width: image.naturalWidth || null, height: image.naturalHeight || null, duration: null }; } finally { URL.revokeObjectURL(url); } }
+    if (file.type.startsWith('video/') || file.type.startsWith('audio/')) { const url = URL.createObjectURL(file); try { const media = document.createElement(file.type.startsWith('video/') ? 'video' : 'audio'); media.preload = 'metadata'; media.src = url; await new Promise<void>((resolve, reject) => { media.onloadedmetadata = () => resolve(); media.onerror = () => reject(new Error('Unable to read media metadata')); }); return { width: file.type.startsWith('video/') ? media.videoWidth || null : null, height: file.type.startsWith('video/') ? media.videoHeight || null : null, duration: Number.isFinite(media.duration) ? media.duration : null }; } finally { URL.revokeObjectURL(url); } }
+    return { width: null, height: null, duration: null };
+  };
+  const uploadFiles = async (files: File[]) => {
+    if (!files.length || !user || uploading) return; setUploading(true); setError(''); setProgress(0);
+    try { const token = await getToken(); if (!token) throw new Error('Your session expired. Please sign in again.');
+      for (let index = 0; index < files.length; index += 1) { const file = files[index]; const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').slice(-120); const pathname = `users/${user.id}/${crypto.randomUUID()}-${safeName}`; const metadata = await getMediaMetadata(file);
+        const blob = await upload(pathname, file, { access: 'public', handleUploadUrl: '/api/assets/upload', contentType: file.type, multipart: file.size > 4 * 1024 * 1024, onUploadProgress: (event) => { const current = (index + event.percentage / 100) / files.length; setProgress(Math.round(current * 100)); } });
+        const finalize = await fetch('/api/assets/finalize', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ pathname: blob.pathname, url: blob.url, name: file.name, contentType: file.type, size: file.size, ...metadata }) });
+        const finalizeData = await finalize.json(); if (!finalize.ok) throw new Error(finalizeData.error || 'Upload completed but could not save the asset');
+      } setProgress(100); await loadAssets();
+    } catch (err) { setError(err instanceof Error ? err.message : 'Upload failed'); } finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
+  };
+  const deleteAsset = async (asset: MediaAsset) => { if (!window.confirm(`Delete “${asset.name}” from your media library?`)) return; try { const token = await getToken(); const response = await fetch(`/api/assets/${asset.id}`, { method: 'DELETE', headers: token ? { Authorization: `Bearer ${token}` } : {} }); const data = response.status === 204 ? {} : await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to delete asset'); setAssets((current) => current.filter((item) => item.id !== asset.id)); } catch (err) { setError(err instanceof Error ? err.message : 'Unable to delete asset'); } };
+  if (!isLoaded) return <main className="media-loading">Opening Media Library…</main>;
+  if (!isSignedIn) return <Redirect to="/sign-in" />;
+  return (<main className="media-library">
+    <header className="media-header"><div className="media-header-left"><a className="media-back" href="/dashboard" aria-label="Back to dashboard"><ArrowRight size={16} /></a><Wordmark /><span className="media-header-divider" /><div><span className="media-kicker">WORKSPACE</span><strong>Media Library</strong></div></div><div className="media-header-actions"><span className="media-user">{user?.firstName?.[0] ?? 'C'}</span><button className="media-upload-button" onClick={() => fileRef.current?.click()}><Upload size={15} /> Upload media</button></div></header>
+    <section className="media-page"><div className="media-intro"><div><span className="eyebrow">01 · Your creative assets</span><h1>Everything you upload,<br /><span>ready to create.</span></h1><p>Keep photos, videos and audio in one persistent library. Your assets are stored separately from the editor so you can reuse them across projects.</p></div><div className="media-drop-card" onClick={() => fileRef.current?.click()}><div className="media-drop-icon"><Upload size={19} /></div><strong>{uploading ? `Uploading ${progress}%` : 'Drop files here'}</strong><span>Images · Video · Audio</span>{uploading && <div className="media-progress"><span style={{ width: `${progress}%` }} /></div>}</div></div>
+      <div className="media-toolbar"><div className="media-tabs">{[['all','All'],['image','Images'],['video','Videos'],['audio','Audio']].map(([value,label]) => <button key={value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)}>{label}</button>)}</div><label className="media-search"><Target size={14} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search assets…" /></label></div>
+      {error && <div className="media-error">{error}</div>}
+      {loading ? <div className="media-grid-skeleton">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="media-skeleton" />)}</div> : assets.length ? <div className="media-grid">{assets.map((asset) => <article className="media-card" key={asset.id}><div className="media-preview">{asset.type === 'image' && <img src={asset.url} alt={asset.name} loading="lazy" />}{asset.type === 'video' && <video src={asset.url} preload="metadata" muted />}{asset.type === 'audio' && <div className="media-audio-art"><span><Play size={18} fill="currentColor" /></span><strong>AUDIO</strong></div>}<span className="media-type-pill">{asset.type}</span>{asset.duration && <span className="media-duration">{formatAssetDuration(asset.duration)}</span>}<button className="media-delete" onClick={() => deleteAsset(asset)} aria-label={`Delete ${asset.name}`}><Trash2 size={14} /></button></div><div className="media-card-meta"><strong title={asset.name}>{asset.name}</strong><span>{formatAssetBytes(asset.size)} · {asset.source === 'ai' ? 'AI generated' : 'Uploaded'}</span></div></article>)}</div> : <div className="media-empty"><div className="media-empty-icon"><ImagePlus size={22} /></div><strong>Your library is empty</strong><span>Upload your first photo, video or audio file. It will stay available across Createora.</span><button onClick={() => fileRef.current?.click()}><Upload size={14} /> Upload your first asset</button></div>}
+    </section><input ref={fileRef} type="file" multiple hidden accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/wav,audio/mp4,audio/webm" onChange={(event) => void uploadFiles(Array.from(event.target.files ?? []))} /></main>);
+}
 function AppRoutes() {
   return (
     <RoutedErrorBoundary>
@@ -1106,6 +1148,7 @@ function AppRoutes() {
         <Route path="/sign-up/*?" component={SignUpPage} />
         <Route path="/forgot-password" component={ForgotPasswordPage} />
         <Route path="/dashboard" component={DashboardPage} />
+        <Route path="/assets" component={MediaLibraryPage} />
         <Route path="/editor" component={CreateoraEditor} />
         <Route component={NotFound} />
       </Switch>
