@@ -834,3 +834,28 @@
   .editor-inspector { display:none; }
   .editor-canvas-wrap { padding:15px; }
 }
+
+
+/* AI image generation panel */
+.ai-inspector-hero { display:grid; gap:7px; padding:18px 17px 6px; }
+.ai-inspector-icon { display:grid; place-items:center; width:38px; height:38px; margin-bottom:3px; border:1px solid rgba(72,190,123,.2); border-radius:10px; background:rgba(58,174,105,.1); color:#62cf8e; }
+.ai-inspector-hero strong { color:#e7ece8; font-size:13px; }
+.ai-inspector-hero > span { max-width:220px; color:#737d76; font-size:8px; line-height:1.5; }
+.ai-section { padding-top:14px; padding-bottom:14px; }
+.ai-prompt-input { min-height:112px !important; line-height:1.5; }
+.ai-ratio-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.ai-ratio-grid button { height:32px; border:1px solid rgba(255,255,255,.08); border-radius:6px; background:#1c201e; color:#78817a; font:700 8px var(--app-font-mono); }
+.ai-ratio-grid button:hover { color:#c9d0cb; border-color:rgba(255,255,255,.14); }
+.ai-ratio-grid button.active { border-color:rgba(63,180,115,.5); background:rgba(55,169,106,.12); color:#65ce8f; }
+.ai-generate-button { display:flex; align-items:center; justify-content:center; gap:8px; width:calc(100% - 34px); height:40px; margin:4px 17px 18px; border:0; border-radius:7px; background:#36a96b; color:#fff; font-size:9px; font-weight:750; }
+.ai-generate-button:hover:not(:disabled) { background:#43b978; }
+.ai-generate-button:disabled { opacity:.4; cursor:not-allowed; }
+.ai-spinner { width:13px; height:13px; border:2px solid rgba(255,255,255,.28); border-top-color:#fff; border-radius:50%; animation:ai-spin .7s linear infinite; }
+@keyframes ai-spin { to { transform:rotate(360deg); } }
+.ai-error { margin:0 17px 12px; padding:9px 10px; border:1px solid rgba(214,103,103,.2); border-radius:6px; background:rgba(176,65,65,.08); color:#d98b8b; font-size:8px; line-height:1.4; }
+.ai-result { margin:0 17px 14px; overflow:hidden; border:1px solid rgba(255,255,255,.08); border-radius:8px; background:#1b1f1d; }
+.ai-result img { display:block; width:100%; max-height:190px; object-fit:cover; background:#202522; }
+.ai-result > div { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px; }
+.ai-result > div > span { color:#7e8780; font-size:7px; }
+.ai-result button { display:flex; align-items:center; gap:5px; padding:6px 8px; border:0; border-radius:5px; background:rgba(58,174,105,.12); color:#69cf91; font-size:7px; font-weight:700; }
+.ai-result button:hover { background:rgba(58,174,105,.2); }
