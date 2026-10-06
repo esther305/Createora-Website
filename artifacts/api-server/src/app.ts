@@ -10,6 +10,7 @@ import {
 } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import type { ErrorRequestHandler } from "express";
 
 const app: Express = express();
 
@@ -46,5 +47,23 @@ app.use(
 );
 
 app.use("/api", router);
+
+const apiErrorHandler: ErrorRequestHandler = (error, req, res, next) => {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+
+  const message =
+    error instanceof Error ? error.message : "Unexpected API server error";
+
+  req.log.error({ err: error }, "Unhandled API request error");
+
+  res.status(500).json({
+    error: message,
+  });
+};
+
+app.use(apiErrorHandler);
 
 export default app;
