@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "@clerk/react";
 import { ArrowLeft, ArrowRight, Film, Image as ImageIcon, LayoutTemplate, MoreHorizontal, Plus, Sparkles, Trash2, WandSparkles } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -45,7 +45,7 @@ function CreateProjectDialog({ onClose, onCreated }: { onClose: () => void; onCr
     "ai-generation": { width: 1024, height: 1024 },
   } as const), []);
 
-  async function submit(event: React.FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     setCreating(true);
     setError("");
