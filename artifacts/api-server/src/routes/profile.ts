@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { getAuth } from "@clerk/express";
 import { db, userProfilesTable } from "@workspace/db";
-import { Profile } from "@workspace/api-zod";
+import { GetProfileResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -23,7 +23,7 @@ router.get("/profile", async (req, res) => {
       })
       .returning();
 
-    res.json(Profile.parse(profile));
+    res.json(GetProfileResponse.parse(profile));
   } catch (error) {
     req.log.error({ err: error, userId }, "Failed to load workspace profile");
     res.status(500).json({ error: "Unable to load workspace profile" });
