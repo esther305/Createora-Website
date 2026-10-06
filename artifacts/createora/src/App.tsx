@@ -41,6 +41,8 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
+import ProjectsPage from '@/pages/projects';
+import ProjectWorkspacePage from '@/pages/project-workspace';
 import { Redirect, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 
 const queryClient = new QueryClient();
@@ -513,10 +515,10 @@ function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
   return (
     <aside className="dashboard-sidebar">
       <div className="dashboard-brand"><Wordmark /><span className="dashboard-plan">STUDIO</span></div>
-      <button className="dashboard-new-project" data-testid="button-dashboard-new-project"><Plus size={16} /> New project</button>
+      <a className="dashboard-new-project" href={`${basePath}/projects`} data-testid="button-dashboard-new-project"><Plus size={16} /> New project</a>
       <nav className="dashboard-nav" aria-label="Workspace navigation">
         <span className="dashboard-nav-label">Workspace</span>
-        {sidebarItems.map((item) => <a className={`dashboard-nav-item ${item.label === 'Overview' ? 'active' : ''}`} key={item.label} href={`#${item.label.toLowerCase()}`} data-testid={`link-dashboard-${item.label.toLowerCase()}`}>{item.icon}<span>{item.label}</span></a>)}
+        {sidebarItems.map((item) => <a className={`dashboard-nav-item ${item.label === 'Overview' ? 'active' : ''}`} key={item.label} href={item.label === 'Projects' ? `${basePath}/projects` : `#${item.label.toLowerCase()}`} data-testid={`link-dashboard-${item.label.toLowerCase()}`}>{item.icon}<span>{item.label}</span></a>)}
         <span className="dashboard-nav-label dashboard-nav-label-spaced">Account</span>
         <a className="dashboard-nav-item" href="#billing" data-testid="link-dashboard-billing"><CreditCard size={16} /><span>Billing</span></a>
         <a className="dashboard-nav-item" href="#settings" data-testid="link-dashboard-settings"><Settings size={16} /><span>Settings</span></a>
@@ -561,7 +563,7 @@ function DashboardPage() {
           </section>
           <aside className="dashboard-side-column">
             <section className="dashboard-widget usage-widget" id="usage"><div className="widget-heading"><span>Usage this month</span><Sparkles size={15} /></div><strong>{credits} <small>credits left</small></strong><div className="usage-bar"><span /></div><div className="widget-meta"><span>{plan} plan</span><a href="#billing" data-testid="link-dashboard-upgrade">Upgrade <ArrowRight size={12} /></a></div></section>
-            <section className="dashboard-widget" id="projects"><div className="widget-heading"><span>Recent projects</span><a href="#projects" data-testid="link-dashboard-view-projects">View all <ArrowRight size={12} /></a></div><div className="recent-project"><span className="project-thumb project-thumb-green" /><div><strong>Sunday campaign</strong><small>4 pieces · Updated today</small></div><MoreHorizontal size={15} /></div><div className="recent-project"><span className="project-thumb project-thumb-blue" /><div><strong>Field notes</strong><small>2 pieces · Updated yesterday</small></div><MoreHorizontal size={15} /></div><button className="widget-link" data-testid="button-dashboard-create-project"><Plus size={14} /> New project</button></section>
+            <section className="dashboard-widget" id="projects"><div className="widget-heading"><span>Recent projects</span><a href="#projects" data-testid="link-dashboard-view-projects">View all <ArrowRight size={12} /></a></div><div className="recent-project"><span className="project-thumb project-thumb-green" /><div><strong>Sunday campaign</strong><small>4 pieces · Updated today</small></div><MoreHorizontal size={15} /></div><div className="recent-project"><span className="project-thumb project-thumb-blue" /><div><strong>Field notes</strong><small>2 pieces · Updated yesterday</small></div><MoreHorizontal size={15} /></div><a className="widget-link" href={`${basePath}/projects`} data-testid="button-dashboard-create-project"><Plus size={14} /> New project</a></section>
             <section className="dashboard-widget dashboard-profile-widget" id="settings"><div className="widget-heading"><span>Workspace profile</span><Settings size={15} /></div><div className="profile-summary"><div className="profile-large-avatar">{user?.firstName?.[0] ?? 'C'}</div><div><strong>{user?.fullName || firstName}</strong><small>{user?.primaryEmailAddress?.emailAddress || 'Creator workspace'}</small></div></div><a className="widget-link" href="#settings" data-testid="link-dashboard-edit-profile">Edit profile <ArrowRight size={14} /></a></section>
           </aside>
         </div>
@@ -593,6 +595,8 @@ function AppRoutes() {
         <Route path="/sign-up/*?" component={SignUpPage} />
         <Route path="/forgot-password" component={ForgotPasswordPage} />
         <Route path="/dashboard" component={DashboardPage} />
+        <Route path="/projects/:id" component={ProjectWorkspacePage} />
+        <Route path="/projects" component={ProjectsPage} />
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>
