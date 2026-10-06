@@ -119,10 +119,21 @@ router.post("/ai/images/generate", async (req, res) => {
       aspectRatio,
     });
   } catch (error) {
-    req.log.error({ err: error, userId }, "AI image generation request failed");
-    res.status(500).json({
-      error: error instanceof Error ? error.message : "Unable to generate the image right now",
-    });
+    const message =
+      error instanceof Error ? error.message : "Unable to generate the image right now";
+
+    req.log.error(
+      {
+        userId,
+        error: message,
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      "AI image generation request failed",
+    );
+
+    if (!res.headersSent) {
+      res.status(500).json({ error: message });
+    }
   }
 });
 
