@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useSignIn, useUser } from '@clerk/react';
 import { shadcn } from '@clerk/themes';
@@ -15,6 +15,17 @@ import {
   FolderKanban,
   Image as ImageIcon,
   ImagePlus,
+  MousePointer2,
+  Type,
+  Square,
+  Upload,
+  Undo2,
+  Redo2,
+  Download,
+  Trash2,
+  ZoomIn,
+  Grid2X2,
+  RotateCw,
   LayoutDashboard,
   Layers3,
   LogOut,
@@ -517,7 +528,7 @@ function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
         <span className="studio-badge">STUDIO</span>
       </div>
 
-      <button className="studio-new-button" data-testid="button-dashboard-new-project">
+      <button className="studio-new-button" data-testid="button-dashboard-new-project" onClick={() => window.location.href = `${basePath}/editor`}>
         <span><Plus size={17} /></span>
         <strong>New project</strong>
         <kbd>⌘ N</kbd>
@@ -583,10 +594,10 @@ function DashboardPage() {
   const credits = profileQuery.data?.credits ?? 30;
   const plan = profileQuery.data?.plan === 'studio' ? 'Studio' : 'Starter';
 
-  const quickCreate = [
+  const quickCreate: Array<{ title: string; description: string; icon: ReactNode; className: string; action?: () => void }> = [
     { title: 'AI Image', description: 'Generate a visual from a prompt', icon: <ImagePlus size={22} />, className: 'image' },
     { title: 'AI Video', description: 'Turn an idea into motion', icon: <Video size={22} />, className: 'video' },
-    { title: 'New Design', description: 'Start with a blank canvas', icon: <PenLine size={22} />, className: 'design' },
+    { title: 'New Design', description: 'Start with a blank canvas', icon: <PenLine size={22} />, className: 'design', action: () => setLocation('/editor') },
     { title: 'Script', description: 'Write your next story', icon: <FileText size={22} />, className: 'script' },
   ];
 
@@ -649,7 +660,7 @@ function DashboardPage() {
             </div>
             <div className="studio-quick-grid">
               {quickCreate.map((tool) => (
-                <button key={tool.title} className={`studio-quick-card ${tool.className}`}>
+                <button key={tool.title} className={`studio-quick-card ${tool.className}`} onClick={tool.action}>
                   <span className="studio-quick-icon">{tool.icon}</span>
                   <span><strong>{tool.title}</strong><small>{tool.description}</small></span>
                   <ArrowUpRight className="studio-card-arrow" size={16} />
@@ -729,6 +740,248 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
+type EditorElement = {
+  id: string;
+  type: 'text' | 'shape' | 'image';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  text?: string;
+  color?: string;
+  src?: string;
+};
+
+function CreateoraEditor() {
+  const { isLoaded, isSignedIn, user } = useAuth();
+  const [, setLocation] = useLocation();
+  const [elements, setElements] = useState<EditorElement[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tool, setTool] = useState<'select' | 'text' | 'shape' | 'image'>('select');
+  const [zoom, setZoom] = useState(72);
+  const [history, setHistory] = useState<EditorElement[][]>([]);
+  const [future, setFuture] = useState<EditorElement[][]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const dragRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
+
+  const selected = elements.find((element) => element.id === selectedId);
+
+  if (!isLoaded) return <main className="editor-loading">Opening editor…</main>;
+  if (!isSignedIn) return <Redirect to="/sign-in" />;
+
+  const commit = (next: EditorElement[]) => {
+    setHistory((current) => [...current.slice(-19), elements]);
+    setFuture([]);
+    setElements(next);
+  };
+
+  const addElement = (element: EditorElement) => {
+    commit([...elements, element]);
+    setSelectedId(element.id);
+    setTool('select');
+  };
+
+  const addText = () => addElement({
+    id: crypto.randomUUID(), type: 'text', x: 240, y: 190, width: 420, height: 90,
+    rotation: 0, text: 'Your headline', color: '#151915'
+  });
+
+  const addShape = () => addElement({
+    id: crypto.randomUUID(), type: 'shape', x: 270, y: 240, width: 260, height: 160,
+    rotation: 0, color: '#2f9e64'
+  });
+
+  const onUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      addElement({
+        id: crypto.randomUUID(), type: 'image', x: 180, y: 140, width: 420, height: 300,
+        rotation: 0, src: String(reader.result)
+      });
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+  };
+
+  const updateSelected = (patch: Partial<EditorElement>) => {
+    if (!selectedId) return;
+    const next = elements.map((element) => element.id === selectedId ? { ...element, ...patch } : element);
+    commit(next);
+  };
+
+  const removeSelected = () => {
+    if (!selectedId) return;
+    commit(elements.filter((element) => element.id !== selectedId));
+    setSelectedId(null);
+  };
+
+  const undo = () => {
+    if (!history.length) return;
+    const previous = history[history.length - 1];
+    setFuture((current) => [elements, ...current].slice(0, 20));
+    setElements(previous);
+    setHistory((current) => current.slice(0, -1));
+    setSelectedId(null);
+  };
+
+  const redo = () => {
+    if (!future.length) return;
+    const next = future[0];
+    setHistory((current) => [...current, elements].slice(-20));
+    setElements(next);
+    setFuture((current) => current.slice(1));
+    setSelectedId(null);
+  };
+
+  const handlePointerDown = (event: React.PointerEvent, element: EditorElement) => {
+    if (tool !== 'select') return;
+    event.stopPropagation();
+    setSelectedId(element.id);
+    const rect = (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect();
+    if (!rect) return;
+    dragRef.current = {
+      id: element.id,
+      offsetX: event.clientX - rect.left - element.x * (zoom / 100),
+      offsetY: event.clientY - rect.top - element.y * (zoom / 100),
+    };
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const scale = zoom / 100;
+    const x = Math.max(0, Math.min(900 - (selected?.width ?? 100), (event.clientX - rect.left - dragRef.current.offsetX) / scale));
+    const y = Math.max(0, Math.min(600 - (selected?.height ?? 80), (event.clientY - rect.top - dragRef.current.offsetY) / scale));
+    setElements((current) => current.map((item) => item.id === dragRef.current?.id ? { ...item, x, y } : item));
+  };
+
+  const finishDrag = () => {
+    if (!dragRef.current) return;
+    const current = elements;
+    setHistory((h) => [...h.slice(-19), current]);
+    setFuture([]);
+    dragRef.current = null;
+  };
+
+  return (
+    <main className="createora-editor">
+      <header className="editor-topbar">
+        <div className="editor-brand">
+          <button className="editor-back" onClick={() => setLocation('/dashboard')}><ArrowRight size={17} /></button>
+          <Wordmark />
+          <span className="editor-divider" />
+          <div className="editor-project-name"><strong>Untitled design</strong><small>Saved locally</small></div>
+        </div>
+        <div className="editor-top-center">
+          <button onClick={undo} disabled={!history.length} aria-label="Undo"><Undo2 size={16} /></button>
+          <button onClick={redo} disabled={!future.length} aria-label="Redo"><Redo2 size={16} /></button>
+          <span className="editor-save-dot" /> Saved
+        </div>
+        <div className="editor-top-right">
+          <button className="editor-icon-action"><Share2 size={16} /> Share</button>
+          <button className="editor-export" onClick={() => window.print()}><Download size={15} /> Export</button>
+          <div className="editor-avatar">{user?.firstName?.[0] ?? 'C'}</div>
+        </div>
+      </header>
+
+      <div className="editor-body">
+        <aside className="editor-toolbar">
+          <button className={tool === 'select' ? 'active' : ''} onClick={() => setTool('select')}><MousePointer2 size={19} /><span>Select</span></button>
+          <button className={tool === 'text' ? 'active' : ''} onClick={() => addText()}><Type size={19} /><span>Text</span></button>
+          <button className={tool === 'shape' ? 'active' : ''} onClick={() => addShape()}><Square size={19} /><span>Shape</span></button>
+          <button onClick={() => fileRef.current?.click()}><Upload size={19} /><span>Upload</span></button>
+          <button><ImagePlus size={19} /><span>Media</span></button>
+          <button><Sparkles size={19} /><span>AI</span></button>
+          <div className="editor-tool-spacer" />
+          <button><Grid2X2 size={18} /><span>Layers</span></button>
+        </aside>
+
+        <section className="editor-stage">
+          <div className="editor-stage-head">
+            <div><span>DESIGN</span><strong>1080 × 1080</strong></div>
+            <div className="editor-zoom"><button onClick={() => setZoom(Math.max(40, zoom - 10))}>−</button><span>{zoom}%</span><button onClick={() => setZoom(Math.min(120, zoom + 10))}><ZoomIn size={14} /></button></div>
+          </div>
+          <div className="editor-canvas-wrap">
+            <div
+              className="editor-canvas"
+              style={{ width: 900 * zoom / 100, height: 600 * zoom / 100 }}
+              onPointerDown={() => setSelectedId(null)}
+              onPointerMove={handlePointerMove}
+              onPointerUp={finishDrag}
+              onPointerLeave={finishDrag}
+            >
+              <div className="editor-canvas-grid" />
+              {elements.map((element) => (
+                <div
+                  key={element.id}
+                  className={`editor-element editor-element-${element.type} ${selectedId === element.id ? 'selected' : ''}`}
+                  style={{
+                    left: element.x * zoom / 100, top: element.y * zoom / 100,
+                    width: element.width * zoom / 100, height: element.height * zoom / 100,
+                    transform: `rotate(${element.rotation}deg)`,
+                    background: element.type === 'shape' ? element.color : undefined,
+                  }}
+                  onPointerDown={(event) => handlePointerDown(event, element)}
+                >
+                  {element.type === 'text' && <span>{element.text}</span>}
+                  {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} />}
+                  {selectedId === element.id && <span className="editor-selection-label">{element.type.toUpperCase()}</span>}
+                </div>
+              ))}
+              {!elements.length && (
+                <div className="editor-empty-canvas" onClick={(event) => { event.stopPropagation(); addText(); }}>
+                  <span><Sparkles size={21} /></span>
+                  <strong>Start creating</strong>
+                  <small>Add text, shapes or upload an image</small>
+                </div>
+              )}
+            </div>
+          </div>
+          <footer className="editor-bottom-bar">
+            <span>Page 1 of 1</span>
+            <span>•</span>
+            <span>Autosave on</span>
+          </footer>
+        </section>
+
+        <aside className="editor-inspector">
+          <div className="inspector-header"><strong>Properties</strong><span>{selected ? selected.type : 'Canvas'}</span></div>
+          {selected ? (
+            <>
+              <div className="inspector-section">
+                <label>Content</label>
+                {selected.type === 'text' && <textarea value={selected.text ?? ''} onChange={(event) => setElements((current) => current.map((item) => item.id === selected.id ? { ...item, text: event.target.value } : item))} />}
+                {selected.type === 'shape' && <div className="color-row"><button className="color-swatch" style={{ background: selected.color }} /><span>{selected.color}</span></div>}
+              </div>
+              <div className="inspector-section">
+                <label>Position</label>
+                <div className="inspector-grid">
+                  <label>X<input type="number" value={Math.round(selected.x)} onChange={(e) => updateSelected({ x: Number(e.target.value) })} /></label>
+                  <label>Y<input type="number" value={Math.round(selected.y)} onChange={(e) => updateSelected({ y: Number(e.target.value) })} /></label>
+                  <label>W<input type="number" value={Math.round(selected.width)} onChange={(e) => updateSelected({ width: Number(e.target.value) })} /></label>
+                  <label>H<input type="number" value={Math.round(selected.height)} onChange={(e) => updateSelected({ height: Number(e.target.value) })} /></label>
+                </div>
+              </div>
+              <div className="inspector-section">
+                <label>Rotation</label>
+                <div className="inspector-slider"><RotateCw size={14} /><input type="range" min="-180" max="180" value={selected.rotation} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} /><span>{selected.rotation}°</span></div>
+              </div>
+              <button className="inspector-delete" onClick={removeSelected}><Trash2 size={15} /> Delete layer</button>
+            </>
+          ) : (
+            <div className="inspector-empty"><Sparkles size={18} /><strong>Nothing selected</strong><span>Select an element to edit its properties.</span></div>
+          )}
+        </aside>
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" hidden onChange={onUpload} />
+    </main>
+  );
+}
+
 function AppRoutes() {
   return (
     <RoutedErrorBoundary>
@@ -738,6 +991,7 @@ function AppRoutes() {
         <Route path="/sign-up/*?" component={SignUpPage} />
         <Route path="/forgot-password" component={ForgotPasswordPage} />
         <Route path="/dashboard" component={DashboardPage} />
+        <Route path="/editor" component={CreateoraEditor} />
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>
