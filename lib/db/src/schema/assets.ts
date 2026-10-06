@@ -15,6 +15,8 @@ export const assetsTable = pgTable("assets", {
   mimeType: text("mime_type"),
 
   url: text("url").notNull(),
+  storageKey: text("storage_key"),
+  source: text("source").notNull().default("upload"),
 
   thumbnailUrl: text("thumbnail_url"),
 
