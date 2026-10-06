@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type ChangeEvent, type PointerEvent } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useSignIn, useUser } from '@clerk/react';
 import { shadcn } from '@clerk/themes';
@@ -792,7 +792,7 @@ function CreateoraEditor() {
     rotation: 0, color: '#2f9e64'
   });
 
-  const onUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const onUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -836,7 +836,7 @@ function CreateoraEditor() {
     setSelectedId(null);
   };
 
-  const handlePointerDown = (event: React.PointerEvent, element: EditorElement) => {
+  const handlePointerDown = (event: PointerEvent, element: EditorElement) => {
     if (tool !== 'select') return;
     event.stopPropagation();
     setSelectedId(element.id);
