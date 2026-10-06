@@ -758,7 +758,12 @@ function CreateoraEditor() {
   const [, setLocation] = useLocation();
   const [elements, setElements] = useState<EditorElement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tool, setTool] = useState<'select' | 'text' | 'shape' | 'image'>('select');
+  const [tool, setTool] = useState<'select' | 'text' | 'shape' | 'image' | 'ai'>('select');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiAspectRatio, setAiAspectRatio] = useState('1:1');
+  const [aiImage, setAiImage] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
   const [zoom, setZoom] = useState(72);
   const [history, setHistory] = useState<EditorElement[][]>([]);
   const [future, setFuture] = useState<EditorElement[][]>([]);
@@ -766,6 +771,50 @@ function CreateoraEditor() {
   const dragRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
 
   const selected = elements.find((element) => element.id === selectedId);
+
+  const generateAIImage = async () => {
+    if (!aiPrompt.trim() || aiLoading) return;
+    setAiLoading(true);
+    setAiError('');
+    setAiImage(null);
+    try {
+      const response = await fetch('/api/ai/images/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: aiPrompt.trim(), aspectRatio: aiAspectRatio }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || 'Unable to generate image');
+      setAiImage(data.image);
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : 'Unable to generate image');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const addGeneratedImage = () => {
+    if (!aiImage) return;
+    const dimensions: Record<string, { width: number; height: number }> = {
+      '1:1': { width: 360, height: 360 },
+      '16:9': { width: 500, height: 281 },
+      '9:16': { width: 300, height: 533 },
+      '4:3': { width: 480, height: 360 },
+    };
+    const size = dimensions[aiAspectRatio] || dimensions['1:1'];
+    addElement({
+      id: crypto.randomUUID(),
+      type: 'image',
+      x: Math.round((900 - size.width) / 2),
+      y: Math.round((600 - size.height) / 2),
+      width: size.width,
+      height: size.height,
+      rotation: 0,
+      src: aiImage,
+    });
+    setAiImage(null);
+    setAiPrompt('');
+  };
 
   if (!isLoaded) return <main className="editor-loading">Opening editor…</main>;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
@@ -895,7 +944,7 @@ function CreateoraEditor() {
           <button className={tool === 'shape' ? 'active' : ''} onClick={() => addShape()}><Square size={19} /><span>Shape</span></button>
           <button onClick={() => fileRef.current?.click()}><Upload size={19} /><span>Upload</span></button>
           <button><ImagePlus size={19} /><span>Media</span></button>
-          <button><Sparkles size={19} /><span>AI</span></button>
+          <button className={tool === 'ai' ? 'active' : ''} onClick={() => { setTool('ai'); setSelectedId(null); }}><Sparkles size={19} /><span>AI</span></button>
           <div className="editor-tool-spacer" />
           <button><Grid2X2 size={18} /><span>Layers</span></button>
         </aside>
@@ -949,34 +998,68 @@ function CreateoraEditor() {
         </section>
 
         <aside className="editor-inspector">
-          <div className="inspector-header"><strong>Properties</strong><span>{selected ? selected.type : 'Canvas'}</span></div>
-          {selected ? (
+          {tool === 'ai' ? (
             <>
-              <div className="inspector-section">
-                <label>Content</label>
-                {selected.type === 'text' && <textarea value={selected.text ?? ''} onChange={(event) => setElements((current) => current.map((item) => item.id === selected.id ? { ...item, text: event.target.value } : item))} />}
-                {selected.type === 'shape' && <div className="color-row"><button className="color-swatch" style={{ background: selected.color }} /><span>{selected.color}</span></div>}
+              <div className="inspector-header"><strong>AI Image</strong><span>Gemini</span></div>
+              <div className="ai-inspector-hero">
+                <div className="ai-inspector-icon"><Sparkles size={18} /></div>
+                <strong>Generate a visual</strong>
+                <span>Describe what you want to create. You can edit the result on the canvas.</span>
               </div>
-              <div className="inspector-section">
-                <label>Position</label>
-                <div className="inspector-grid">
-                  <label>X<input type="number" value={Math.round(selected.x)} onChange={(e) => updateSelected({ x: Number(e.target.value) })} /></label>
-                  <label>Y<input type="number" value={Math.round(selected.y)} onChange={(e) => updateSelected({ y: Number(e.target.value) })} /></label>
-                  <label>W<input type="number" value={Math.round(selected.width)} onChange={(e) => updateSelected({ width: Number(e.target.value) })} /></label>
-                  <label>H<input type="number" value={Math.round(selected.height)} onChange={(e) => updateSelected({ height: Number(e.target.value) })} /></label>
+              <div className="inspector-section ai-section">
+                <label>Prompt</label>
+                <textarea className="ai-prompt-input" value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} placeholder="A cinematic product photo of a premium sneaker on a Lagos rooftop at golden hour…" />
+              </div>
+              <div className="inspector-section ai-section">
+                <label>Aspect ratio</label>
+                <div className="ai-ratio-grid">
+                  {['1:1', '16:9', '9:16', '4:3'].map((ratio) => (
+                    <button key={ratio} className={aiAspectRatio === ratio ? 'active' : ''} onClick={() => setAiAspectRatio(ratio)}>{ratio}</button>
+                  ))}
                 </div>
               </div>
-              <div className="inspector-section">
-                <label>Rotation</label>
-                <div className="inspector-slider"><RotateCw size={14} /><input type="range" min="-180" max="180" value={selected.rotation} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} /><span>{selected.rotation}°</span></div>
-              </div>
-              <button className="inspector-delete" onClick={removeSelected}><Trash2 size={15} /> Delete layer</button>
+              {aiError && <div className="ai-error">{aiError}</div>}
+              {aiImage && (
+                <div className="ai-result">
+                  <img src={aiImage} alt="Generated AI preview" />
+                  <div><span>Generated image</span><button onClick={addGeneratedImage}>Add to canvas <ArrowRight size={13} /></button></div>
+                </div>
+              )}
+              <button className="ai-generate-button" disabled={!aiPrompt.trim() || aiLoading} onClick={generateAIImage}>
+                {aiLoading ? <><span className="ai-spinner" /> Generating…</> : <><Sparkles size={15} /> Generate image</>}
+              </button>
             </>
           ) : (
-            <div className="inspector-empty"><Sparkles size={18} /><strong>Nothing selected</strong><span>Select an element to edit its properties.</span></div>
+            <>
+              <div className="inspector-header"><strong>Properties</strong><span>{selected ? selected.type : 'Canvas'}</span></div>
+              {selected ? (
+                <>
+                  <div className="inspector-section">
+                    <label>Content</label>
+                    {selected.type === 'text' && <textarea value={selected.text ?? ''} onChange={(event) => setElements((current) => current.map((item) => item.id === selected.id ? { ...item, text: event.target.value } : item))} />}
+                    {selected.type === 'shape' && <div className="color-row"><button className="color-swatch" style={{ background: selected.color }} /><span>{selected.color}</span></div>}
+                  </div>
+                  <div className="inspector-section">
+                    <label>Position</label>
+                    <div className="inspector-grid">
+                      <label>X<input type="number" value={Math.round(selected.x)} onChange={(e) => updateSelected({ x: Number(e.target.value) })} /></label>
+                      <label>Y<input type="number" value={Math.round(selected.y)} onChange={(e) => updateSelected({ y: Number(e.target.value) })} /></label>
+                      <label>W<input type="number" value={Math.round(selected.width)} onChange={(e) => updateSelected({ width: Number(e.target.value) })} /></label>
+                      <label>H<input type="number" value={Math.round(selected.height)} onChange={(e) => updateSelected({ height: Number(e.target.value) })} /></label>
+                    </div>
+                  </div>
+                  <div className="inspector-section">
+                    <label>Rotation</label>
+                    <div className="inspector-slider"><RotateCw size={14} /><input type="range" min="-180" max="180" value={selected.rotation} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} /><span>{selected.rotation}°</span></div>
+                  </div>
+                  <button className="inspector-delete" onClick={removeSelected}><Trash2 size={15} /> Delete layer</button>
+                </>
+              ) : (
+                <div className="inspector-empty"><Sparkles size={18} /><strong>Nothing selected</strong><span>Select an element to edit its properties.</span></div>
+              )}
+            </>
           )}
-        </aside>
-      </div>
+        </aside>   </div>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={onUpload} />
     </main>
   );
