@@ -284,7 +284,6 @@ router.post("/ai/images/generate", async (req, res) => {
         clerkUserId: userId,
         assetId: asset.assetId,
         outputUrl: asset.url,
-        clerkUserId: userId,
         type: "image",
         provider: result.provider,
         model: result.model,
