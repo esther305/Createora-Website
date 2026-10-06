@@ -603,14 +603,11 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 
-function App() {
-  if (!clerkPubKey) {
-    throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in environment');
-  }
+function ClerkApp() {
+  const [, setLocation] = useLocation();
 
   return (
-    <WouterRouter base={basePath}>
-      <ClerkProvider
+    <ClerkProvider
         publishableKey={clerkPubKey}
         proxyUrl={clerkProxyUrl}
         appearance={{
@@ -662,14 +659,8 @@ function App() {
           signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to access your workspace' } },
           signUp: { start: { title: 'Create your account', subtitle: 'Start making better content today' } },
         }}
-        routerPush={(to) => {
-          const [, setLocation] = useLocation();
-          setLocation(stripBase(to));
-        }}
-        routerReplace={(to) => {
-          const [, setLocation] = useLocation();
-          setLocation(stripBase(to), { replace: true });
-        }}
+        routerPush={(to) => setLocation(stripBase(to))}
+        routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
       >
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
@@ -684,3 +675,16 @@ function App() {
 }
 
 export default App;
+}
+
+function App() {
+  if (!clerkPubKey) {
+    throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in environment');
+  }
+
+  return (
+    <WouterRouter base={basePath}>
+      <ClerkApp />
+    </WouterRouter>
+  );
+}
