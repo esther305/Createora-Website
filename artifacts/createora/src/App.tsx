@@ -505,25 +505,65 @@ const dashboardTools = [
 
 function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
   const sidebarItems = [
-    { label: 'Overview', icon: <LayoutDashboard size={16} /> },
-    { label: 'Projects', icon: <FolderKanban size={16} /> },
-    { label: 'Files', icon: <FileBox size={16} /> },
+    { label: 'Home', icon: <LayoutDashboard size={17} /> },
+    { label: 'Projects', icon: <FolderKanban size={17} /> },
+    { label: 'Assets', icon: <FileBox size={17} /> },
+    { label: 'Templates', icon: <Layers3 size={17} /> },
   ];
   return (
-    <aside className="dashboard-sidebar">
-      <div className="dashboard-brand"><Wordmark /><span className="dashboard-plan">STUDIO</span></div>
-      <button className="dashboard-new-project" data-testid="button-dashboard-new-project"><Plus size={16} /> New project</button>
-      <nav className="dashboard-nav" aria-label="Workspace navigation">
-        <span className="dashboard-nav-label">Workspace</span>
-        {sidebarItems.map((item) => <a className={`dashboard-nav-item ${item.label === 'Overview' ? 'active' : ''}`} key={item.label} href={`#${item.label.toLowerCase()}`} data-testid={`link-dashboard-${item.label.toLowerCase()}`}>{item.icon}<span>{item.label}</span></a>)}
-        <span className="dashboard-nav-label dashboard-nav-label-spaced">Account</span>
-        <a className="dashboard-nav-item" href="#billing" data-testid="link-dashboard-billing"><CreditCard size={16} /><span>Billing</span></a>
-        <a className="dashboard-nav-item" href="#settings" data-testid="link-dashboard-settings"><Settings size={16} /><span>Settings</span></a>
+    <aside className="studio-sidebar">
+      <div className="studio-brand-row">
+        <Wordmark />
+        <span className="studio-badge">STUDIO</span>
+      </div>
+
+      <button className="studio-new-button" data-testid="button-dashboard-new-project">
+        <span><Plus size={17} /></span>
+        <strong>New project</strong>
+        <kbd>⌘ N</kbd>
+      </button>
+
+      <nav className="studio-nav" aria-label="Createora workspace">
+        <span className="studio-nav-label">Workspace</span>
+        {sidebarItems.map((item, index) => (
+          <a
+            className={`studio-nav-item ${index === 0 ? 'active' : ''}`}
+            key={item.label}
+            href={index === 0 ? '#top' : `#${item.label.toLowerCase()}`}
+            data-testid={`link-dashboard-${item.label.toLowerCase()}`}
+          >
+            {item.icon}<span>{item.label}</span>
+            {item.label === 'Projects' && <small>12</small>}
+          </a>
+        ))}
+
+        <span className="studio-nav-label studio-nav-spaced">Create with AI</span>
+        <a className="studio-nav-item studio-ai-nav" href="#ai-studio">
+          <span className="studio-nav-ai-icon"><Sparkles size={16} /></span>
+          <span>AI Studio</span>
+          <Zap size={13} />
+        </a>
+
+        <span className="studio-nav-label studio-nav-spaced">Account</span>
+        <a className="studio-nav-item" href="#billing"><CreditCard size={17} /><span>Billing</span></a>
+        <a className="studio-nav-item" href="#settings"><Settings size={17} /><span>Settings</span></a>
       </nav>
-      <div className="dashboard-sidebar-bottom">
-        <a className="dashboard-help" href="mailto:hello@createora.co" data-testid="link-dashboard-help"><CircleHelp size={16} /> Help center</a>
-        <button className="dashboard-profile-link" data-testid="button-dashboard-profile"><UserRound size={16} /><span>Profile</span><MoreHorizontal size={15} /></button>
-        <button className="dashboard-logout sidebar-logout" onClick={onLogout} data-testid="button-dashboard-logout"><LogOut size={16} /> Log out</button>
+
+      <div className="studio-sidebar-bottom">
+        <div className="studio-credit-mini">
+          <div><span>AI credits</span><strong>30 left</strong></div>
+          <div className="studio-credit-track"><span /></div>
+          <small>Starter plan · <a href="#billing">Upgrade</a></small>
+        </div>
+        <a className="studio-help" href="mailto:hello@createora.co"><CircleHelp size={16} /> Help center</a>
+        <button className="studio-user-row" data-testid="button-dashboard-profile">
+          <span className="studio-user-avatar">K</span>
+          <span><strong>My workspace</strong><small>Personal</small></span>
+          <MoreHorizontal size={16} />
+        </button>
+        <button className="studio-logout" onClick={onLogout} data-testid="button-dashboard-logout">
+          <LogOut size={15} /> Log out
+        </button>
       </div>
     </aside>
   );
@@ -533,36 +573,142 @@ function DashboardPage() {
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
   const { signOut } = useClerk();
+  const [, setLocation] = useLocation();
   const profileQuery = useGetProfile({ query: { enabled: Boolean(isSignedIn), queryKey: getGetProfileQueryKey() } });
 
-  if (!isLoaded) return <main className="dashboard-loading">Loading workspace…</main>;
+  if (!isLoaded) return <main className="studio-loading">Loading your studio…</main>;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
 
   const firstName = user?.firstName || user?.username || 'creator';
   const credits = profileQuery.data?.credits ?? 30;
   const plan = profileQuery.data?.plan === 'studio' ? 'Studio' : 'Starter';
 
+  const quickCreate = [
+    { title: 'AI Image', description: 'Generate a visual from a prompt', icon: <ImagePlus size={22} />, className: 'image' },
+    { title: 'AI Video', description: 'Turn an idea into motion', icon: <Video size={22} />, className: 'video' },
+    { title: 'New Design', description: 'Start with a blank canvas', icon: <PenLine size={22} />, className: 'design' },
+    { title: 'Script', description: 'Write your next story', icon: <FileText size={22} />, className: 'script' },
+  ];
+
+  const recentProjects = [
+    { name: 'Sunday campaign', type: 'Social campaign', time: 'Edited today', className: 'project-green', tag: 'DESIGN' },
+    { name: 'Field notes', type: 'Brand story', time: 'Edited yesterday', className: 'project-purple', tag: 'VIDEO' },
+    { name: 'Launch visuals', type: 'Product launch', time: 'Edited 3 days ago', className: 'project-orange', tag: 'IMAGE' },
+  ];
+
   return (
-    <main className="dashboard-page">
+    <main className="studio-shell">
       <DashboardSidebar onLogout={() => signOut({ redirectUrl: basePath || '/' })} />
-      <section className="dashboard-content">
-        <header className="dashboard-topbar">
-          <div><span className="eyebrow">Tuesday, August 12, 2026</span><h1>Good morning, {firstName}.</h1></div>
-          <div className="dashboard-top-actions"><span className="dashboard-credits"><Sparkles size={14} /> {credits} AI credits</span><button className="dashboard-avatar" data-testid="button-dashboard-user" aria-label="Open profile">{user?.firstName?.[0] ?? 'C'}{user?.lastName?.[0] ?? ''}</button></div>
+
+      <section className="studio-main">
+        <header className="studio-topbar">
+          <div className="studio-mobile-brand"><Wordmark /></div>
+          <div className="studio-search">
+            <span><ArrowRight size={14} /></span>
+            <input placeholder="Search projects, assets and templates" aria-label="Search workspace" />
+            <kbd>/</kbd>
+          </div>
+          <div className="studio-top-actions">
+            <button className="studio-icon-btn" aria-label="Notifications"><Clock3 size={17} /></button>
+            <div className="studio-top-avatar">{user?.firstName?.[0] ?? 'C'}{user?.lastName?.[0] ?? ''}</div>
+          </div>
         </header>
-        <div className="dashboard-main-grid">
-          <section className="dashboard-section dashboard-studio-section" id="overview">
-            <div className="dashboard-section-heading"><div><span className="eyebrow">Createora studio</span><h2>What are we making?</h2></div><button className="dashboard-icon-button" data-testid="button-dashboard-studio-menu" aria-label="Studio options"><MoreHorizontal size={18} /></button></div>
-            <div className="dashboard-prompt"><WandSparkles size={18} /><span>Describe a feeling, not a format...</span><button data-testid="button-dashboard-start-prompt" aria-label="Start creating"><ArrowRight size={16} /></button></div>
-            <div className="dashboard-tool-grid">
-              {dashboardTools.map((tool) => <button className={`dashboard-tool-card ${tool.className ?? ''}`} key={tool.title} data-testid={`button-dashboard-tool-${tool.title.toLowerCase().replaceAll(' ', '-')}`}><span className="dashboard-tool-icon">{tool.icon}</span><span className="dashboard-tool-copy"><strong>{tool.title}</strong><small>{tool.description}</small></span><ArrowUpRight size={15} /></button>)}
+
+        <div className="studio-page">
+          <section className="studio-welcome">
+            <div>
+              <span className="studio-eyebrow"><span className="studio-status-dot" /> YOUR CREATIVE WORKSPACE</span>
+              <h1>Good morning, {firstName}.</h1>
+              <p>What are you making today? Start from an idea or jump straight into a tool.</p>
+            </div>
+            <div className="studio-date">AUG 2026 <span>•</span> {plan.toUpperCase()}</div>
+          </section>
+
+          <section className="studio-hero-card">
+            <div className="studio-hero-copy">
+              <span className="studio-eyebrow light">CREATEORA AI</span>
+              <h2>Start with an idea.<br /><em>We'll build from there.</em></h2>
+              <p>Describe what you want to create and let Createora turn the rough idea into a first draft.</p>
+            </div>
+            <div className="studio-prompt-wrap">
+              <div className="studio-prompt-box">
+                <WandSparkles size={19} />
+                <span>“Create a bold launch visual for…”</span>
+                <button aria-label="Start with AI" onClick={() => setLocation('/dashboard#ai-studio')}><ArrowRight size={17} /></button>
+              </div>
+              <div className="studio-prompt-hints"><span>Try: product ad</span><span>Try: Instagram reel</span><span>Try: brand poster</span></div>
+            </div>
+            <div className="studio-orbit studio-orbit-one" />
+            <div className="studio-orbit studio-orbit-two" />
+          </section>
+
+          <section className="studio-section">
+            <div className="studio-section-head">
+              <div><span className="studio-eyebrow">QUICK CREATE</span><h2>Choose your starting point</h2></div>
+              <a href="#templates">Explore templates <ArrowRight size={14} /></a>
+            </div>
+            <div className="studio-quick-grid">
+              {quickCreate.map((tool) => (
+                <button key={tool.title} className={`studio-quick-card ${tool.className}`}>
+                  <span className="studio-quick-icon">{tool.icon}</span>
+                  <span><strong>{tool.title}</strong><small>{tool.description}</small></span>
+                  <ArrowUpRight className="studio-card-arrow" size={16} />
+                </button>
+              ))}
             </div>
           </section>
-          <aside className="dashboard-side-column">
-            <section className="dashboard-widget usage-widget" id="usage"><div className="widget-heading"><span>Usage this month</span><Sparkles size={15} /></div><strong>{credits} <small>credits left</small></strong><div className="usage-bar"><span /></div><div className="widget-meta"><span>{plan} plan</span><a href="#billing" data-testid="link-dashboard-upgrade">Upgrade <ArrowRight size={12} /></a></div></section>
-            <section className="dashboard-widget" id="projects"><div className="widget-heading"><span>Recent projects</span><a href="#projects" data-testid="link-dashboard-view-projects">View all <ArrowRight size={12} /></a></div><div className="recent-project"><span className="project-thumb project-thumb-green" /><div><strong>Sunday campaign</strong><small>4 pieces · Updated today</small></div><MoreHorizontal size={15} /></div><div className="recent-project"><span className="project-thumb project-thumb-blue" /><div><strong>Field notes</strong><small>2 pieces · Updated yesterday</small></div><MoreHorizontal size={15} /></div><button className="widget-link" data-testid="button-dashboard-create-project"><Plus size={14} /> New project</button></section>
-            <section className="dashboard-widget dashboard-profile-widget" id="settings"><div className="widget-heading"><span>Workspace profile</span><Settings size={15} /></div><div className="profile-summary"><div className="profile-large-avatar">{user?.firstName?.[0] ?? 'C'}</div><div><strong>{user?.fullName || firstName}</strong><small>{user?.primaryEmailAddress?.emailAddress || 'Creator workspace'}</small></div></div><a className="widget-link" href="#settings" data-testid="link-dashboard-edit-profile">Edit profile <ArrowRight size={14} /></a></section>
-          </aside>
+
+          <div className="studio-content-grid">
+            <section className="studio-section studio-projects" id="projects">
+              <div className="studio-section-head">
+                <div><span className="studio-eyebrow">YOUR WORK</span><h2>Recent projects</h2></div>
+                <a href="#projects">View all <ArrowRight size={14} /></a>
+              </div>
+              <div className="studio-project-grid">
+                {recentProjects.map((project) => (
+                  <button className="studio-project-card" key={project.name}>
+                    <div className={`studio-project-art ${project.className}`}>
+                      <span>{project.tag}</span>
+                      <div className="studio-art-shape" />
+                    </div>
+                    <div className="studio-project-meta">
+                      <div><strong>{project.name}</strong><small>{project.type} · {project.time}</small></div>
+                      <MoreHorizontal size={16} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <aside className="studio-side-stack">
+              <section className="studio-panel" id="ai-studio">
+                <div className="studio-panel-top"><span className="studio-panel-icon"><Sparkles size={17} /></span><span>AI Studio</span><span className="studio-live-pill">LIVE</span></div>
+                <h3>One workspace.<br />Every format.</h3>
+                <p>Generate images, video concepts, scripts and social content without leaving your creative flow.</p>
+                <button onClick={() => setLocation('/dashboard#ai-studio')}>Open AI Studio <ArrowRight size={14} /></button>
+              </section>
+
+              <section className="studio-panel studio-usage-panel">
+                <div className="studio-panel-top"><span>MONTHLY USAGE</span><Sparkles size={15} /></div>
+                <div className="studio-usage-number"><strong>{credits}</strong><span>credits<br />remaining</span></div>
+                <div className="studio-usage-track"><span style={{ width: `${Math.min(100, Math.max(8, (credits / 30) * 100))}%` }} /></div>
+                <div className="studio-usage-footer"><span>{plan} plan</span><a href="#billing">Manage plan</a></div>
+              </section>
+            </aside>
+          </div>
+
+          <section className="studio-section studio-templates" id="templates">
+            <div className="studio-section-head">
+              <div><span className="studio-eyebrow">START FASTER</span><h2>Popular templates</h2></div>
+              <a href="#templates">Browse library <ArrowRight size={14} /></a>
+            </div>
+            <div className="studio-template-row">
+              <button className="studio-template-card"><span className="template-art template-social">NEW<br />DROP</span><strong>Product launch</strong><small>Social · 9:16</small></button>
+              <button className="studio-template-card"><span className="template-art template-promo">BIG<br />SALE</span><strong>Promo campaign</strong><small>Ad · 1:1</small></button>
+              <button className="studio-template-card"><span className="template-art template-reel">YOUR<br />STORY</span><strong>Story reel</strong><small>Video · 9:16</small></button>
+              <button className="studio-template-card"><span className="template-art template-brand">BRAND<br />NOTE</span><strong>Brand announcement</strong><small>Post · 4:5</small></button>
+            </div>
+          </section>
         </div>
       </section>
     </main>
