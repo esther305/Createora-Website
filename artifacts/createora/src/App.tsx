@@ -754,7 +754,7 @@ type EditorElement = {
 };
 
 function CreateoraEditor() {
-  const { isLoaded, isSignedIn, user } = useAuth();
+  const { isLoaded, isSignedIn, user, getToken } = useAuth();
   const [, setLocation] = useLocation();
   const [elements, setElements] = useState<EditorElement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -777,14 +777,44 @@ function CreateoraEditor() {
     setAiLoading(true);
     setAiError('');
     setAiImage(null);
+
     try {
+      const token = await getToken();
       const response = await fetch('/api/ai/images/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: aiPrompt.trim(), aspectRatio: aiAspectRatio }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          prompt: aiPrompt.trim(),
+          aspectRatio: aiAspectRatio,
+        }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || 'Unable to generate image');
+
+      const raw = await response.text();
+      let data: { image?: string; error?: string } = {};
+
+      if (raw.trim()) {
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          throw new Error(
+            `AI server returned an invalid response (HTTP ${response.status}). Please restart the API server and try again.`,
+          );
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || `AI image generation failed (HTTP ${response.status})`,
+        );
+      }
+
+      if (!data.image) {
+        throw new Error('The AI server returned no image data.');
+      }
+
       setAiImage(data.image);
     } catch (error) {
       setAiError(error instanceof Error ? error.message : 'Unable to generate image');
