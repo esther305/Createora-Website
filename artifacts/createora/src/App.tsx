@@ -799,12 +799,14 @@ function CreateoraEditor() {
         try {
           data = JSON.parse(raw);
         } catch {
+          const bodyPreview = raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 240);
           throw new Error(
-            `AI server returned an invalid response (HTTP ${response.status}). Please restart the API server and try again.`,
+            bodyPreview
+              ? `AI server returned an invalid response (HTTP ${response.status}): ${bodyPreview}`
+              : `AI server returned an invalid response (HTTP ${response.status}). Check the API server terminal for the error.`,
           );
         }
       }
-
       if (!response.ok) {
         throw new Error(
           data.error || `AI image generation failed (HTTP ${response.status})`,
