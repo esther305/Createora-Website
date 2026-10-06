@@ -21,6 +21,12 @@ export default function ProjectWorkspacePage() {
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState<CanvasElement[][]>([]);
   const [future, setFuture] = useState<CanvasElement[][]>([]);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiAspect, setAiAspect] = useState("1:1");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiPreview, setAiPreview] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const drag = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
 
@@ -128,6 +134,24 @@ export default function ProjectWorkspacePage() {
 
   function onCanvasPointerUp() { drag.current = null; }
 
+  async function generateAI() {
+    if (!aiPrompt.trim()) return;
+    setAiGenerating(true); setAiError(null); setAiPreview(null);
+    try {
+      const response = await fetch("/api/ai/images/generate", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt: aiPrompt.trim(), aspectRatio: aiAspect }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Generation failed");
+      setAiPreview(data.image);
+    } catch (error) { setAiError(error instanceof Error ? error.message : "Generation failed"); }
+    finally { setAiGenerating(false); }
+  }
+
+  function addGeneratedImage() {
+    if (!aiPreview) return;
+    const item: CanvasElement = { id: makeId(), kind: "image", x: 120, y: 120, width: 720, height: 720, rotation: 0, opacity: 1, src: aiPreview };
+    commit([...elements, item]); setSelectedId(item.id); setAiPreview(null); setAiPrompt(""); setAiOpen(false);
+  }
+
   function upload() {
     fileInput.current?.click();
   }
@@ -203,7 +227,7 @@ export default function ProjectWorkspacePage() {
           <button className="editor-tool" onClick={upload}><Upload size={18} /><span>Upload</span></button>
           <button className={"editor-tool " + (tool === "text" ? "active" : "")} onClick={addText}><Type size={18} /><span>Text</span></button>
           <button className={"editor-tool " + (tool === "shape" ? "active" : "")} onClick={addShape}><Square size={18} /><span>Shape</span></button>
-          <button className="editor-tool"><Sparkles size={18} /><span>AI</span></button>
+          <button className={"editor-tool " + (aiOpen ? "active" : "")} onClick={() => { setAiOpen(true); setAiError(null); }}><Sparkles size={18} /><span>AI</span></button>
           <button className="editor-tool"><Layers3 size={18} /><span>Layers</span></button>
           {isVideo && <button className="editor-tool"><Video size={18} /><span>Video</span></button>}
           <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleFile} hidden />
@@ -220,6 +244,7 @@ export default function ProjectWorkspacePage() {
           </div>
           {isVideo && <div className="editor-timeline"><span className="timeline-label">TIMELINE</span><div className="timeline-track"><i /><i /><i /></div></div>}
         </section>
+        {aiOpen && <div className="ai-panel"><div className="ai-panel-head"><div><span className="eyebrow">Createora AI</span><h2>Generate image</h2></div><button onClick={() => setAiOpen(false)}>×</button></div><p>Describe the image you want. The result can be placed directly onto this canvas.</p><textarea value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} placeholder="A premium Nigerian fashion campaign for a Lagos streetwear brand, cinematic photography…" /><div className="ai-options"><label>Aspect<select value={aiAspect} onChange={(event) => setAiAspect(event.target.value)}><option value="1:1">Square 1:1</option><option value="16:9">Landscape 16:9</option><option value="9:16">Portrait 9:16</option><option value="4:3">Classic 4:3</option></select></label></div>{aiError && <div className="ai-error">{aiError}</div>}{aiPreview && <img className="ai-preview" src={aiPreview} alt="Generated preview" />}{aiPreview ? <button className="ai-primary" onClick={addGeneratedImage}>Add to canvas</button> : <button className="ai-primary" disabled={aiGenerating || !aiPrompt.trim()} onClick={generateAI}>{aiGenerating ? "Generating…" : "Generate image"}</button>}</div>}
         <aside className="editor-inspector">
           <span className="eyebrow">Inspector</span>
           {selected ? <div className="inspector-controls">
