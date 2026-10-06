@@ -670,11 +670,7 @@ function ClerkApp() {
           </TooltipProvider>
         </QueryClientProvider>
       </ClerkProvider>
-    </WouterRouter>
   );
-}
-
-export default App;
 }
 
 function App() {
