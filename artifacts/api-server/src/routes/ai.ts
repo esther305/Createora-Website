@@ -5,7 +5,7 @@ const router: IRouter = Router();
 
 const aspectRatios = new Set(["1:1", "16:9", "9:16", "4:3"]);
 
-router.post("/api/ai/images/generate", async (req, res) => {
+router.post("/ai/images/generate", async (req, res) => {
   const { userId } = getAuth(req);
 
   if (!userId) {
