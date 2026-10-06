@@ -540,3 +540,29 @@
   .editor-body { grid-template-columns: 55px 1fr; }
   .editor-canvas-inner { width: 92%; }
 }
+
+
+/* Functional image studio */
+.editor-artboard { position: relative; width: min(78vw, 680px); max-width: 680px; max-height: 72vh; overflow: hidden; background: white; box-shadow: 0 30px 100px hsl(0 0% 0% / .38); transform-origin: center; }
+.editor-artboard-video { height: min(72vh, 680px); width: auto; }
+.canvas-element { position: absolute; box-sizing: border-box; cursor: grab; transform-origin: center; user-select: none; }
+.canvas-element:active { cursor: grabbing; }
+.canvas-element.selected { outline: 2px solid hsl(151 61% 48%); outline-offset: 3px; }
+.canvas-element img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.canvas-element.text { display: flex; align-items: center; padding: 12px; color: #111827; font: 800 clamp(20px, 3vw, 46px)/1.05 Arial, sans-serif; white-space: pre-wrap; }
+.canvas-element.shape { border-radius: 4px; background: #10b981; }
+.editor-artboard-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 9px; color: #10b981; background: linear-gradient(135deg, #fff, #f4faf7); }
+.editor-artboard-empty strong { color: #111827; font: 800 25px var(--app-font-serif); letter-spacing: -.05em; }
+.editor-artboard-empty span { color: #64748b; font-size: 11px; }
+.inspector-controls { margin-top: 18px; }
+.inspector-controls h2 { margin: 8px 0 20px; }
+.inspector-controls label { display: grid; gap: 7px; margin-bottom: 15px; color: hsl(0 0% 100% / .48); font: 700 8px var(--app-font-mono); text-transform: uppercase; letter-spacing: .08em; }
+.inspector-controls input, .inspector-controls textarea { box-sizing: border-box; width: 100%; min-height: 35px; padding: 7px 9px; border: 1px solid hsl(0 0% 100% / .1); border-radius: 6px; outline: none; background: hsl(0 0% 100% / .05); color: white; font: 12px Arial, sans-serif; text-transform: none; letter-spacing: 0; }
+.inspector-controls textarea { min-height: 70px; resize: vertical; }
+.inspector-controls input:focus, .inspector-controls textarea:focus { border-color: hsl(151 61% 48% / .7); }
+.inspector-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
+.inspector-controls input[type="range"] { min-height: 4px; padding: 0; accent-color: hsl(151 61% 48%); }
+.inspector-delete { display: inline-flex; align-items: center; gap: 7px; width: 100%; justify-content: center; min-height: 36px; margin-top: 4px; border: 1px solid hsl(0 70% 60% / .2); border-radius: 6px; background: hsl(0 70% 50% / .07); color: hsl(0 75% 70%); font-size: 10px; }
+.inspector-empty { display: grid; justify-items: center; gap: 10px; margin-top: 90px; color: hsl(0 0% 100% / .35); text-align: center; }
+.inspector-empty p { max-width: 180px; margin: 0; }
+.editor-actions button:disabled { opacity: .3; cursor: not-allowed; }
