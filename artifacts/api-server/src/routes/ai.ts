@@ -41,10 +41,13 @@ router.post("/ai/images/generate", async (req, res) => {
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
         body: JSON.stringify({
           contents: [
             {
@@ -64,11 +67,36 @@ router.post("/ai/images/generate", async (req, res) => {
       },
     );
 
-    const payload = await response.json();
+    const raw = await response.text();
+    let payload: any = {};
+
+    try {
+      payload = raw ? JSON.parse(raw) : {};
+    } catch (parseError) {
+      req.log.error(
+        { status: response.status, raw, err: parseError },
+        "Gemini returned a non-JSON response",
+      );
+      res.status(502).json({
+        error: `Gemini returned an invalid response (HTTP ${response.status})`,
+      });
+      return;
+    }
 
     if (!response.ok) {
-      req.log.error({ status: response.status, payload }, "Gemini image generation failed");
-      res.status(502).json({ error: "The AI image service could not generate an image" });
+      const providerMessage =
+        typeof payload?.error?.message === "string"
+          ? payload.error.message
+          : "The AI provider rejected the request.";
+
+      req.log.error(
+        { status: response.status, payload },
+        "Gemini image generation failed",
+      );
+
+      res.status(502).json({
+        error: `Gemini: ${providerMessage}`,
+      });
       return;
     }
 
@@ -92,7 +120,9 @@ router.post("/ai/images/generate", async (req, res) => {
     });
   } catch (error) {
     req.log.error({ err: error, userId }, "AI image generation request failed");
-    res.status(500).json({ error: "Unable to generate the image right now" });
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Unable to generate the image right now",
+    });
   }
 });
 
