@@ -611,7 +611,7 @@ function ProjectsPage() {
 
   const loadProjects = async () => {
     const token = await getToken();
-    const response = await fetch('/api/projects', { headers: token ? { Authorization: \`Bearer \${token}\` } : {} });
+    const response = await fetch('/api/projects', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Unable to load projects');
     setProjects(data.projects ?? []);
@@ -631,12 +631,12 @@ function ProjectsPage() {
       const token = await getToken();
       const response = await fetch('/api/projects', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: \`Bearer \${token}\` } : {}) },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ name: type === 'video' ? 'Untitled video' : 'Untitled design', type, width: type === 'video' ? 1920 : 1080, height: 1080 }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Unable to create project');
-      setLocation(\`/editor?project=\${data.project.id}\`);
+      setLocation(`/editor?project=${data.project.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to create project');
       setCreating(false);
@@ -644,10 +644,10 @@ function ProjectsPage() {
   };
 
   const deleteProject = async (project: CreateoraProject) => {
-    if (!window.confirm(\`Delete “\${project.name}”? This cannot be undone.\`)) return;
+    if (!window.confirm(`Delete “${project.name}”? This cannot be undone.`)) return;
     try {
       const token = await getToken();
-      const response = await fetch(\`/api/projects/\${project.id}\`, { method: 'DELETE', headers: token ? { Authorization: \`Bearer \${token}\` } : {} });
+      const response = await fetch(`/api/projects/${project.id}`, { method: 'DELETE', headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!response.ok) { const data = await response.json(); throw new Error(data.error || 'Unable to delete project'); }
       setProjects((current) => current.filter((item) => item.id !== project.id));
     } catch (err) {
@@ -674,7 +674,7 @@ function ProjectsPage() {
         </div>
         <div className="projects-toolbar"><div><span className="projects-count">{projects.length}</span> {projects.length === 1 ? 'project' : 'projects'}</div><label><Target size={14} /><input id="projects-search" name="projects-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search projects…" /></label></div>
         {error && <div className="projects-error">{error}</div>}
-        {loading ? <div className="projects-grid">{Array.from({ length: 6 }).map((_, index) => <div className="project-card-skeleton" key={index} />)}</div> : visibleProjects.length ? <div className="projects-grid">{visibleProjects.map((project) => <article className="workspace-project-card" key={project.id}><button className={\`workspace-project-art \${projectClassName(project.type)}\`} onClick={() => setLocation(\`/editor?project=\${project.id}\`)} aria-label={\`Open \${project.name}\`}><span>{projectTypeLabel(project.type)}</span><div className="workspace-art-shape" /></button><div className="workspace-project-meta"><button onClick={() => setLocation(\`/editor?project=\${project.id}\`)}><strong>{project.name}</strong><small>{project.width ?? 1080} × {project.height ?? 1080} · {new Date(project.updatedAt).toLocaleDateString()}</small></button><button className="workspace-project-delete" onClick={() => void deleteProject(project)} aria-label={\`Delete \${project.name}\`}><Trash2 size={15} /></button></div></article>)}</div> : <div className="projects-empty"><div><FolderKanban size={22} /></div><strong>No projects yet</strong><span>Create your first image or video project above. Your work will stay saved in your workspace.</span><button onClick={() => void createProject('image')}><Plus size={14} /> Create project</button></div>}
+        {loading ? <div className="projects-grid">{Array.from({ length: 6 }).map((_, index) => <div className="project-card-skeleton" key={index} />)}</div> : visibleProjects.length ? <div className="projects-grid">{visibleProjects.map((project) => <article className="workspace-project-card" key={project.id}><button className={`workspace-project-art ${projectClassName(project.type)}`} onClick={() => setLocation(`/editor?project=${project.id}`)} aria-label={`Open ${project.name}`}><span>{projectTypeLabel(project.type)}</span><div className="workspace-art-shape" /></button><div className="workspace-project-meta"><button onClick={() => setLocation(`/editor?project=${project.id}`)}><strong>{project.name}</strong><small>{project.width ?? 1080} × {project.height ?? 1080} · {new Date(project.updatedAt).toLocaleDateString()}</small></button><button className="workspace-project-delete" onClick={() => void deleteProject(project)} aria-label={`Delete ${project.name}`}><Trash2 size={15} /></button></div></article>)}</div> : <div className="projects-empty"><div><FolderKanban size={22} /></div><strong>No projects yet</strong><span>Create your first image or video project above. Your work will stay saved in your workspace.</span><button onClick={() => void createProject('image')}><Plus size={14} /> Create project</button></div>}
       </section>
     </main>
   );
@@ -783,8 +783,8 @@ function DashboardPage() {
               </div>
               <div className="studio-project-grid">
                 {recentProjects.length ? recentProjects.map((project) => (
-                  <button className="studio-project-card" key={project.id} onClick={() => setLocation(\`/editor?project=\${project.id}\`)}>
-                    <div className={\`studio-project-art \${projectClassName(project.type)}\`}><span>{projectTypeLabel(project.type)}</span><div className="studio-art-shape" /></div>
+                  <button className="studio-project-card" key={project.id} onClick={() => setLocation(`/editor?project=${project.id}`)}>
+                    <div className={`studio-project-art ${projectClassName(project.type)}`}><span>{projectTypeLabel(project.type)}</span><div className="studio-art-shape" /></div>
                     <div className="studio-project-meta"><div><strong>{project.name}</strong><small>{project.width ?? 1080} × {project.height ?? 1080} · {new Date(project.updatedAt).toLocaleDateString()}</small></div><MoreHorizontal size={16} /></div>
                   </button>
                 )) : (
@@ -860,7 +860,7 @@ function ClerkQueryClientCacheInvalidator() {
 
 type EditorElement = {
   id: string;
-  type: 'text' | 'shape' | 'image';
+  type: 'text' | 'shape' | 'image' | 'video';
   x: number;
   y: number;
   width: number;
@@ -876,7 +876,10 @@ function CreateoraEditor() {
   const [, setLocation] = useLocation();
   const [elements, setElements] = useState<EditorElement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tool, setTool] = useState<'select' | 'text' | 'shape' | 'image' | 'ai'>('select');
+  const [tool, setTool] = useState<'select' | 'text' | 'shape' | 'image' | 'media' | 'ai'>('select');
+  const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaError, setMediaError] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiAspectRatio, setAiAspectRatio] = useState('1:1');
   const [aiImage, setAiImage] = useState<string | null>(null);
@@ -894,6 +897,30 @@ function CreateoraEditor() {
 
   const selected = elements.find((element) => element.id === selectedId);
 
+  const loadEditorMedia = async () => {
+    try {
+      setMediaLoading(true);
+      setMediaError('');
+      const token = await getToken();
+      if (!token) throw new Error('Your session expired. Please sign in again.');
+      const response = await fetch('/api/assets', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to load media');
+      setMediaAssets(data.assets ?? []);
+    } catch (error) {
+      setMediaError(error instanceof Error ? error.message : 'Unable to load media');
+    } finally {
+      setMediaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isSignedIn && tool === 'media') void loadEditorMedia();
+  }, [isSignedIn, tool]);
+
+
   useEffect(() => {
     if (!isSignedIn) return;
     let cancelled = false;
@@ -903,7 +930,7 @@ function CreateoraEditor() {
         if (!token) throw new Error('Your session expired. Please sign in again.');
         const requestedId = new URLSearchParams(window.location.search).get('project');
         if (requestedId) {
-          const response = await fetch(\`/api/projects/\${requestedId}\`, { headers: { Authorization: \`Bearer \${token}\` } });
+          const response = await fetch(`/api/projects/${requestedId}`, { headers: { Authorization: `Bearer ${token}` } });
           const data = await response.json();
           if (!response.ok) throw new Error(data.error || 'Unable to open project');
           const documentData = data.project.document as { elements?: unknown[] } | null;
@@ -916,14 +943,14 @@ function CreateoraEditor() {
           }
           return;
         }
-        const response = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: \`Bearer \${token}\` }, body: JSON.stringify({ name: 'Untitled design', type: 'image', width: 1080, height: 1080 }) });
+        const response = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: 'Untitled design', type: 'image', width: 1080, height: 1080 }) });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Unable to create project');
         if (!cancelled) {
           setProjectId(data.project.id);
           setProjectName(data.project.name);
           setProjectReady(true);
-          setLocation(\`/editor?project=\${data.project.id}\`);
+          setLocation(`/editor?project=${data.project.id}`);
         }
       } catch (error) {
         if (!cancelled) window.alert(error instanceof Error ? error.message : 'Unable to open project');
@@ -940,7 +967,7 @@ function CreateoraEditor() {
         try {
           const token = await getToken();
           if (!token) return;
-          await fetch(\`/api/projects/\${projectId}\`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: \`Bearer \${token}\` }, body: JSON.stringify({ name: projectName, document: { version: 1, elements } }) });
+          await fetch(`/api/projects/${projectId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: projectName, document: { version: 1, elements } }) });
         } catch {}
       })();
     }, 650);
@@ -1049,6 +1076,28 @@ function CreateoraEditor() {
     id: crypto.randomUUID(), type: 'shape', x: 270, y: 240, width: 260, height: 160,
     rotation: 0, color: '#2f9e64'
   });
+
+  const addMediaAsset = (asset: MediaAsset) => {
+    const isVideo = asset.type === 'video' || asset.mimeType?.startsWith('video/');
+    const sourceWidth = asset.width || 720;
+    const sourceHeight = asset.height || (isVideo ? 405 : 720);
+    const maxWidth = 520;
+    const scale = Math.min(1, maxWidth / sourceWidth);
+    const width = Math.round(sourceWidth * scale);
+    const height = Math.round(sourceHeight * scale);
+
+    addElement({
+      id: crypto.randomUUID(),
+      type: isVideo ? 'video' : 'image',
+      x: Math.round((900 - width) / 2),
+      y: Math.round((600 - height) / 2),
+      width,
+      height,
+      rotation: 0,
+      src: asset.url,
+    });
+  };
+
 
   const onUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -1190,7 +1239,7 @@ function CreateoraEditor() {
           <button className={tool === 'text' ? 'active' : ''} onClick={() => addText()}><Type size={19} /><span>Text</span></button>
           <button className={tool === 'shape' ? 'active' : ''} onClick={() => addShape()}><Square size={19} /><span>Shape</span></button>
           <button onClick={() => fileRef.current?.click()}><Upload size={19} /><span>Upload</span></button>
-          <button onClick={() => setLocation('/assets')}><ImagePlus size={19} /><span>Media</span></button>
+          <button className={tool === 'media' ? 'active' : ''} onClick={() => { setTool('media'); setSelectedId(null); }}><ImagePlus size={19} /><span>Media</span></button>
           <button className={tool === 'ai' ? 'active' : ''} onClick={() => { setTool('ai'); setSelectedId(null); }}><Sparkles size={19} /><span>AI</span></button>
           <div className="editor-tool-spacer" />
           <button><Grid2X2 size={18} /><span>Layers</span></button>
@@ -1225,6 +1274,7 @@ function CreateoraEditor() {
                 >
                   {element.type === 'text' && <span>{element.text}</span>}
                   {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} />}
+                  {element.type === 'video' && element.src && <video src={element.src} muted playsInline preload="metadata" draggable={false} />}
                   {selectedId === element.id && <span className="editor-selection-label">{element.type.toUpperCase()}</span>}
                 </div>
               ))}
@@ -1245,7 +1295,45 @@ function CreateoraEditor() {
         </section>
 
         <aside className="editor-inspector">
-          {tool === 'ai' ? (
+          {tool === 'media' ? (
+            <>
+              <div className="inspector-header"><strong>Media Library</strong><span>{mediaAssets.length} items</span></div>
+              <div className="editor-media-panel">
+                <div className="editor-media-panel-head">
+                  <strong>Place media</strong>
+                  <button onClick={() => setLocation('/assets')} title="Open full Media Library"><ArrowUpRight size={14} /></button>
+                </div>
+                <p>Select an image or video to place it on this project.</p>
+                {mediaError && <div className="editor-media-error">{mediaError}</div>}
+                {mediaLoading ? (
+                  <div className="editor-media-loading">Loading your media…</div>
+                ) : mediaAssets.length ? (
+                  <div className="editor-media-grid">
+                    {mediaAssets.map((asset) => (
+                      <button key={asset.id} className="editor-media-item" onClick={() => addMediaAsset(asset)} title={asset.name}>
+                        <span className="editor-media-thumb">
+                          {asset.type === 'video' ? (
+                            <video src={asset.url} muted playsInline preload="metadata" />
+                          ) : (
+                            <img src={asset.url} alt="" />
+                          )}
+                          <span className="editor-media-type">{asset.type === 'video' ? 'VIDEO' : 'IMAGE'}</span>
+                        </span>
+                        <strong>{asset.name}</strong>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="editor-media-empty">
+                    <ImagePlus size={20} />
+                    <strong>Your library is empty</strong>
+                    <span>Upload photos or videos from Media Library, then place them here.</span>
+                    <button onClick={() => setLocation('/assets')}>Open Media Library <ArrowRight size={13} /></button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : tool === 'ai' ? (
             <>
               <div className="inspector-header"><strong>AI Image</strong><span>Gemini</span></div>
               <div className="ai-inspector-hero">
