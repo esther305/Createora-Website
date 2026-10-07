@@ -1249,6 +1249,7 @@ async function uploadAssetDirect(
   const response = await fetch('/api/assets/upload-direct', {
     method: 'POST',
     headers: {
+      Accept: 'application/json',
       Authorization: `Bearer ${token}`,
       'Content-Type': file.type,
       'X-Asset-Name': encodeURIComponent(file.name),
