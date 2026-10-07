@@ -1,4 +1,5 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import { put, del } from "@vercel/blob";
 import { Router, type IRouter } from "express";
 import { getAuth } from "@clerk/express";
 import { db, assetsTable } from "@workspace/db";
@@ -66,6 +67,114 @@ router.post("/assets/upload", async (req, res) => {
     req.log.error({ error, userId }, "Asset upload token request failed");
     res.status(400).json({
       error: error instanceof Error ? error.message : "Unable to prepare upload",
+    });
+  }
+});
+
+
+const getNumberHeader = (
+  value: string | string[] | undefined,
+): number | null => {
+  if (typeof value !== "string") return null;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+router.post("/assets/upload-direct", async (req, res) => {
+  const { userId } = getAuth(req);
+
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const contentTypeHeader = req.headers["content-type"];
+  const contentType =
+    typeof contentTypeHeader === "string"
+      ? contentTypeHeader.split(";")[0].trim()
+      : "";
+
+  const nameHeader = req.headers["x-asset-name"];
+  const name =
+    typeof nameHeader === "string"
+      ? decodeURIComponent(nameHeader).trim()
+      : "";
+
+  const size =
+    getNumberHeader(req.headers["x-asset-size"]) ??
+    (typeof req.headers["content-length"] === "string"
+      ? Number(req.headers["content-length"])
+      : null);
+
+  const width = getNumberHeader(req.headers["x-asset-width"]);
+  const height = getNumberHeader(req.headers["x-asset-height"]);
+  const duration = getNumberHeader(req.headers["x-asset-duration"]);
+
+  if (!name) {
+    res.status(400).json({ error: "Asset filename is missing" });
+    return;
+  }
+
+  if (!contentType || !allowedContentTypes.includes(contentType)) {
+    res.status(400).json({
+      error: `Unsupported media type: ${contentType || "unknown"}`,
+    });
+    return;
+  }
+
+  if (!Buffer.isBuffer(req.body)) {
+    res.status(400).json({ error: "Upload body was not received as binary data" });
+    return;
+  }
+
+  if (req.body.length > maxUploadBytes) {
+    res.status(413).json({ error: "File is larger than the 500 MB upload limit" });
+    return;
+  }
+
+  const safeName = name.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-120);
+  const pathname = `users/${userId}/${crypto.randomUUID()}-${safeName}`;
+
+  try {
+    req.log.info(
+      { userId, pathname, contentType, size: req.body.length },
+      "Uploading media directly to Blob",
+    );
+
+    const blob = await put(pathname, req.body, {
+      access: "public",
+      contentType,
+      addRandomSuffix: false,
+    });
+
+    const asset = {
+      id: crypto.randomUUID(),
+      clerkUserId: userId,
+      name: name.slice(0, 180),
+      type: assetTypeFromMime(contentType),
+      mimeType: contentType,
+      url: blob.url,
+      storageKey: blob.pathname,
+      source: "upload",
+      width,
+      height,
+      duration,
+      size: size ?? req.body.length,
+    };
+
+    await db.insert(assetsTable).values(asset);
+
+    req.log.info(
+      { userId, assetId: asset.id, url: asset.url },
+      "Media upload completed",
+    );
+
+    res.status(201).json({ asset });
+  } catch (error) {
+    req.log.error({ error, userId }, "Direct media upload failed");
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Unable to upload media",
     });
   }
 });
@@ -181,7 +290,6 @@ router.delete("/assets/:id", async (req, res) => {
       return;
     }
 
-    const { del } = await import("@vercel/blob");
     await del(asset.url);
 
     await db
