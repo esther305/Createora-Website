@@ -1187,7 +1187,7 @@ function MediaLibraryPage() {
     if (!files.length || !user || uploading) return; setUploading(true); setError(''); setProgress(0);
     try { const token = await getToken(); if (!token) throw new Error('Your session expired. Please sign in again.');
       for (let index = 0; index < files.length; index += 1) { const file = files[index]; const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').slice(-120); const pathname = `users/${user.id}/${crypto.randomUUID()}-${safeName}`; const metadata = await getMediaMetadata(file);
-        const blob = await upload(pathname, file, { access: 'public', handleUploadUrl: '/api/assets/upload', contentType: file.type, multipart: file.size > 4 * 1024 * 1024, onUploadProgress: (event) => { const current = (index + event.percentage / 100) / files.length; setProgress(Math.round(current * 100)); } });
+        const blob = await upload(pathname, file, { access: 'public', handleUploadUrl: '/api/assets/upload', headers: { Authorization: `Bearer ${token}` }, contentType: file.type, multipart: file.size > 4 * 1024 * 1024, onUploadProgress: (event) => { const current = (index + event.percentage / 100) / files.length; setProgress(Math.round(current * 100)); } });
         const finalize = await fetch('/api/assets/finalize', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ pathname: blob.pathname, url: blob.url, name: file.name, contentType: file.type, size: file.size, ...metadata }) });
         const finalizeData = await finalize.json(); if (!finalize.ok) throw new Error(finalizeData.error || 'Upload completed but could not save the asset');
       } setProgress(100); await loadAssets();
