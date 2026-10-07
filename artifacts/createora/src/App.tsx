@@ -1106,7 +1106,7 @@ function CreateoraEditor() {
               </div>
               <div className="inspector-section ai-section">
                 <label>Prompt</label>
-                <textarea className="ai-prompt-input" value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} placeholder="A cinematic product photo of a premium sneaker on a Lagos rooftop at golden hour…" />
+                <textarea id="ai-prompt" name="ai-prompt" className="ai-prompt-input" value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} placeholder="A cinematic product photo of a premium sneaker on a Lagos rooftop at golden hour…" />
               </div>
               <div className="inspector-section ai-section">
                 <label>Aspect ratio</label>
@@ -1134,21 +1134,21 @@ function CreateoraEditor() {
                 <>
                   <div className="inspector-section">
                     <label>Content</label>
-                    {selected.type === 'text' && <textarea value={selected.text ?? ''} onChange={(event) => setElements((current) => current.map((item) => item.id === selected.id ? { ...item, text: event.target.value } : item))} />}
+                    {selected.type === 'text' && <textarea id="selected-text-content" name="selected-text-content" value={selected.text ?? ''} onChange={(event) => setElements((current) => current.map((item) => item.id === selected.id ? { ...item, text: event.target.value } : item))} />}
                     {selected.type === 'shape' && <div className="color-row"><button className="color-swatch" style={{ background: selected.color }} /><span>{selected.color}</span></div>}
                   </div>
                   <div className="inspector-section">
                     <label>Position</label>
                     <div className="inspector-grid">
-                      <label>X<input type="number" value={Math.round(selected.x)} onChange={(e) => updateSelected({ x: Number(e.target.value) })} /></label>
-                      <label>Y<input type="number" value={Math.round(selected.y)} onChange={(e) => updateSelected({ y: Number(e.target.value) })} /></label>
-                      <label>W<input type="number" value={Math.round(selected.width)} onChange={(e) => updateSelected({ width: Number(e.target.value) })} /></label>
-                      <label>H<input type="number" value={Math.round(selected.height)} onChange={(e) => updateSelected({ height: Number(e.target.value) })} /></label>
+                      <label>X<input id="element-x" name="element-x" type="number" value={Math.round(selected.x)} onChange={(e) => updateSelected({ x: Number(e.target.value) })} /></label>
+                      <label>Y<input id="element-y" name="element-y" type="number" value={Math.round(selected.y)} onChange={(e) => updateSelected({ y: Number(e.target.value) })} /></label>
+                      <label>W<input id="element-width" name="element-width" type="number" value={Math.round(selected.width)} onChange={(e) => updateSelected({ width: Number(e.target.value) })} /></label>
+                      <label>H<input id="element-height" name="element-height" type="number" value={Math.round(selected.height)} onChange={(e) => updateSelected({ height: Number(e.target.value) })} /></label>
                     </div>
                   </div>
                   <div className="inspector-section">
                     <label>Rotation</label>
-                    <div className="inspector-slider"><RotateCw size={14} /><input type="range" min="-180" max="180" value={selected.rotation} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} /><span>{selected.rotation}°</span></div>
+                    <div className="inspector-slider"><RotateCw size={14} /><input id="element-rotation" name="element-rotation" type="range" min="-180" max="180" value={selected.rotation} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} /><span>{selected.rotation}°</span></div>
                   </div>
                   <button className="inspector-delete" onClick={removeSelected}><Trash2 size={15} /> Delete layer</button>
                 </>
@@ -1158,7 +1158,7 @@ function CreateoraEditor() {
             </>
           )}
         </aside>   </div>
-      <input ref={fileRef} type="file" accept="image/*" hidden onChange={onUpload} />
+      <input id="editor-upload" name="editor-upload" ref={fileRef} type="file" accept="image/*" hidden onChange={onUpload} />
     </main>
   );
 }
@@ -1199,10 +1199,10 @@ function MediaLibraryPage() {
   return (<main className="media-library">
     <header className="media-header"><div className="media-header-left"><a className="media-back" href="/dashboard" aria-label="Back to dashboard"><ArrowRight size={16} /></a><Wordmark /><span className="media-header-divider" /><div><span className="media-kicker">WORKSPACE</span><strong>Media Library</strong></div></div><div className="media-header-actions"><span className="media-user">{user?.firstName?.[0] ?? 'C'}</span><button className="media-upload-button" onClick={() => fileRef.current?.click()}><Upload size={15} /> Upload media</button></div></header>
     <section className="media-page"><div className="media-intro"><div><span className="eyebrow">01 · Your creative assets</span><h1>Everything you upload,<br /><span>ready to create.</span></h1><p>Keep photos, videos and audio in one persistent library. Your assets are stored separately from the editor so you can reuse them across projects.</p></div><div className="media-drop-card" onClick={() => fileRef.current?.click()}><div className="media-drop-icon"><Upload size={19} /></div><strong>{uploading ? `Uploading ${progress}%` : 'Drop files here'}</strong><span>Images · Video · Audio</span>{uploading && <div className="media-progress"><span style={{ width: `${progress}%` }} /></div>}</div></div>
-      <div className="media-toolbar"><div className="media-tabs">{[['all','All'],['image','Images'],['video','Videos'],['audio','Audio']].map(([value,label]) => <button key={value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)}>{label}</button>)}</div><label className="media-search"><Target size={14} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search assets…" /></label></div>
+      <div className="media-toolbar"><div className="media-tabs">{[['all','All'],['image','Images'],['video','Videos'],['audio','Audio']].map(([value,label]) => <button key={value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)}>{label}</button>)}</div><label className="media-search"><Target size={14} /><input id="media-search" name="media-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search assets…" /></label></div>
       {error && <div className="media-error">{error}</div>}
       {loading ? <div className="media-grid-skeleton">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="media-skeleton" />)}</div> : assets.length ? <div className="media-grid">{assets.map((asset) => <article className="media-card" key={asset.id}><div className="media-preview">{asset.type === 'image' && <img src={asset.url} alt={asset.name} loading="lazy" />}{asset.type === 'video' && <video src={asset.url} preload="metadata" muted />}{asset.type === 'audio' && <div className="media-audio-art"><span><Play size={18} fill="currentColor" /></span><strong>AUDIO</strong></div>}<span className="media-type-pill">{asset.type}</span>{asset.duration && <span className="media-duration">{formatAssetDuration(asset.duration)}</span>}<button className="media-delete" onClick={() => deleteAsset(asset)} aria-label={`Delete ${asset.name}`}><Trash2 size={14} /></button></div><div className="media-card-meta"><strong title={asset.name}>{asset.name}</strong><span>{formatAssetBytes(asset.size)} · {asset.source === 'ai' ? 'AI generated' : 'Uploaded'}</span></div></article>)}</div> : <div className="media-empty"><div className="media-empty-icon"><ImagePlus size={22} /></div><strong>Your library is empty</strong><span>Upload your first photo, video or audio file. It will stay available across Createora.</span><button onClick={() => fileRef.current?.click()}><Upload size={14} /> Upload your first asset</button></div>}
-    </section><input ref={fileRef} type="file" multiple hidden accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/wav,audio/mp4,audio/webm" onChange={(event) => void uploadFiles(Array.from(event.target.files ?? []))} /></main>);
+    </section><input id="media-library-upload" name="media-library-upload" ref={fileRef} type="file" multiple hidden accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/wav,audio/mp4,audio/webm" onChange={(event) => void uploadFiles(Array.from(event.target.files ?? []))} /></main>);
 }
 function AppRoutes() {
   return (
