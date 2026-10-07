@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type ReactNode, type ChangeEvent, type PointerEvent } from 'react';
-import { upload } from '@vercel/blob/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useSignIn, useUser } from '@clerk/react';
 import { shadcn } from '@clerk/themes';
@@ -898,56 +897,48 @@ function CreateoraEditor() {
     if (!file) return;
 
     try {
-      const token = await getToken();
-      if (!token) throw new Error('Your session expired. Please sign in again.');
+      if (!file.type.startsWith('image/')) {
+        throw new Error('The editor currently accepts image files only.');
+      }
 
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').slice(-120);
-      const pathname = `users/${user?.id ?? 'unknown'}/${crypto.randomUUID()}-${safeName}`;
-      const blob = await upload(pathname, file, {
-        access: 'public',
-        handleUploadUrl: '/api/assets/upload',
-        contentType: file.type,
-      });
+      const token = await getToken();
+      if (!token) {
+        throw new Error('Your session expired. Please sign in again.');
+      }
 
       const image = new Image();
-      image.src = blob.url;
-      await new Promise<void>((resolve, reject) => {
-        image.onload = () => resolve();
-        image.onerror = () => reject(new Error('Unable to read uploaded image'));
-      });
+      const objectUrl = URL.createObjectURL(file);
 
-      const finalize = await fetch('/api/assets/finalize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          pathname: blob.pathname,
-          url: blob.url,
-          name: file.name,
-          contentType: file.type,
-          size: file.size,
+      try {
+        image.src = objectUrl;
+
+        await new Promise<void>((resolve, reject) => {
+          image.onload = () => resolve();
+          image.onerror = () => reject(new Error('Unable to read uploaded image'));
+        });
+
+        const asset = await uploadAssetDirect(file, token, {
           width: image.naturalWidth || null,
           height: image.naturalHeight || null,
-        }),
-      });
+        });
 
-      const data = await finalize.json();
-      if (!finalize.ok) throw new Error(data.error || 'Unable to save uploaded image');
-
-      addElement({
-        id: crypto.randomUUID(),
-        type: 'image',
-        x: 180,
-        y: 140,
-        width: 420,
-        height: 300,
-        rotation: 0,
-        src: data.asset.url,
-      });
+        addElement({
+          id: crypto.randomUUID(),
+          type: 'image',
+          x: 180,
+          y: 140,
+          width: 420,
+          height: 300,
+          rotation: 0,
+          src: asset.url,
+        });
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Unable to upload image');
+      window.alert(
+        error instanceof Error ? error.message : 'Unable to upload image',
+      );
     } finally {
       event.target.value = '';
     }
@@ -1184,15 +1175,38 @@ function MediaLibraryPage() {
     return { width: null, height: null, duration: null };
   };
   const uploadFiles = async (files: File[]) => {
-    if (!files.length || !user || uploading) return; setUploading(true); setError(''); setProgress(0);
-    try { const token = await getToken(); if (!token) throw new Error('Your session expired. Please sign in again.');
-      for (let index = 0; index < files.length; index += 1) { const file = files[index]; const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').slice(-120); const pathname = `users/${user.id}/${crypto.randomUUID()}-${safeName}`; const metadata = await getMediaMetadata(file);
-        const blob = await upload(pathname, file, { access: 'public', handleUploadUrl: '/api/assets/upload', headers: { Authorization: `Bearer ${token}` }, contentType: file.type, multipart: file.size > 4 * 1024 * 1024, onUploadProgress: (event) => { const current = (index + event.percentage / 100) / files.length; setProgress(Math.round(current * 100)); } });
-        const finalize = await fetch('/api/assets/finalize', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ pathname: blob.pathname, url: blob.url, name: file.name, contentType: file.type, size: file.size, ...metadata }) });
-        const finalizeData = await finalize.json(); if (!finalize.ok) throw new Error(finalizeData.error || 'Upload completed but could not save the asset');
-      } setProgress(100); await loadAssets();
-    } catch (err) { setError(err instanceof Error ? err.message : 'Upload failed'); } finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
+    if (!files.length || !user || uploading) return;
+
+    setUploading(true);
+    setError('');
+    setProgress(0);
+
+    try {
+      const token = await getToken();
+
+      if (!token) {
+        throw new Error('Your session expired. Please sign in again.');
+      }
+
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index];
+        const metadata = await getMediaMetadata(file);
+
+        await uploadAssetDirect(file, token, metadata);
+
+        setProgress(Math.round(((index + 1) / files.length) * 100));
+      }
+
+      await loadAssets();
+      setProgress(100);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
   };
+
   const deleteAsset = async (asset: MediaAsset) => { if (!window.confirm(`Delete “${asset.name}” from your media library?`)) return; try { const token = await getToken(); const response = await fetch(`/api/assets/${asset.id}`, { method: 'DELETE', headers: token ? { Authorization: `Bearer ${token}` } : {} }); const data = response.status === 204 ? {} : await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to delete asset'); setAssets((current) => current.filter((item) => item.id !== asset.id)); } catch (err) { setError(err instanceof Error ? err.message : 'Unable to delete asset'); } };
   if (!isLoaded) return <main className="media-loading">Opening Media Library…</main>;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
@@ -1219,6 +1233,62 @@ function AppRoutes() {
       </Switch>
     </RoutedErrorBoundary>
   );
+}
+
+type DirectUploadMetadata = {
+  width?: number | null;
+  height?: number | null;
+  duration?: number | null;
+};
+
+async function uploadAssetDirect(
+  file: File,
+  token: string,
+  metadata: DirectUploadMetadata = {},
+) {
+  const response = await fetch('/api/assets/upload-direct', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': file.type,
+      'X-Asset-Name': encodeURIComponent(file.name),
+      'X-Asset-Size': String(file.size),
+      'X-Asset-Width': metadata.width == null ? '' : String(metadata.width),
+      'X-Asset-Height': metadata.height == null ? '' : String(metadata.height),
+      'X-Asset-Duration':
+        metadata.duration == null ? '' : String(metadata.duration),
+    },
+    body: file,
+  });
+
+  const raw = await response.text();
+
+  let data: {
+    asset?: MediaAsset;
+    error?: string;
+  } = {};
+
+  if (raw.trim()) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new Error(
+        `Upload server returned an invalid response (HTTP ${response.status}).`,
+      );
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || `Upload failed (HTTP ${response.status}).`,
+    );
+  }
+
+  if (!data.asset) {
+    throw new Error('Upload completed but no asset was returned.');
+  }
+
+  return data.asset;
 }
 
 function RoutedErrorBoundary({ children }: { children: ReactNode }) {
