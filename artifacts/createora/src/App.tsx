@@ -906,7 +906,8 @@ function CreateoraEditor() {
           const response = await fetch(\`/api/projects/\${requestedId}\`, { headers: { Authorization: \`Bearer \${token}\` } });
           const data = await response.json();
           if (!response.ok) throw new Error(data.error || 'Unable to open project');
-          const savedElements = Array.isArray(data.project.document?.elements) ? data.project.document.elements : [];
+          const documentData = data.project.document as { elements?: unknown[] } | null;
+          const savedElements = Array.isArray(documentData?.elements) ? documentData.elements as EditorElement[] : [];
           if (!cancelled) {
             setProjectId(data.project.id);
             setProjectName(data.project.name);
