@@ -108,7 +108,12 @@ router.patch("/projects/:id", async (req, res) => {
     return;
   }
 
-  const updates: Record<string, unknown> = {};
+  const updates: {
+    name?: string;
+    thumbnail?: string;
+    document?: unknown;
+    updatedAt: Date;
+  } = { updatedAt: new Date() };
   if (typeof req.body?.name === "string") updates.name = req.body.name.trim().slice(0, 180);
   if (typeof req.body?.thumbnail === "string") updates.thumbnail = req.body.thumbnail;
   if (req.body && Object.prototype.hasOwnProperty.call(req.body, "document")) {
@@ -120,7 +125,6 @@ router.patch("/projects/:id", async (req, res) => {
     return;
   }
 
-  updates.updatedAt = new Date();
 
   try {
     const [project] = await db
