@@ -54,3 +54,5 @@ Thumbs.db
 !.env.example
 artifacts/api-server/.env
 artifacts/createora/.env.local
+.vercel
+.env*
