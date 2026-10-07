@@ -869,6 +869,11 @@ type EditorElement = {
   text?: string;
   color?: string;
   src?: string;
+  opacity?: number;
+  brightness?: number;
+  contrast?: number;
+  saturation?: number;
+  grayscale?: number;
 };
 
 function CreateoraEditor() {
@@ -1268,6 +1273,10 @@ function CreateoraEditor() {
                     left: element.x * zoom / 100, top: element.y * zoom / 100,
                     width: element.width * zoom / 100, height: element.height * zoom / 100,
                     transform: `rotate(${element.rotation}deg)`,
+                    opacity: element.opacity ?? 1,
+                    filter: element.type === 'image' || element.type === 'video'
+                      ? `brightness(${element.brightness ?? 100}%) contrast(${element.contrast ?? 100}%) saturate(${element.saturation ?? 100}%) grayscale(${element.grayscale ?? 0}%)`
+                      : undefined,
                     background: element.type === 'shape' ? element.color : undefined,
                   }}
                   onPointerDown={(event) => handlePointerDown(event, element)}
@@ -1387,6 +1396,36 @@ function CreateoraEditor() {
                     <label>Rotation</label>
                     <div className="inspector-slider"><RotateCw size={14} /><input id="element-rotation" name="element-rotation" type="range" min="-180" max="180" value={selected.rotation} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} /><span>{selected.rotation}°</span></div>
                   </div>
+
+                  {(selected.type === 'image' || selected.type === 'video') && (
+                    <div className="inspector-section media-adjustments">
+                      <div className="inspector-section-title">Adjustments</div>
+                      {[
+                        ['Opacity', 'opacity', 0.1, 1, 0.05, selected.opacity ?? 1],
+                        ['Brightness', 'brightness', 0, 200, 1, selected.brightness ?? 100],
+                        ['Contrast', 'contrast', 0, 200, 1, selected.contrast ?? 100],
+                        ['Saturation', 'saturation', 0, 200, 1, selected.saturation ?? 100],
+                        ['Grayscale', 'grayscale', 0, 100, 1, selected.grayscale ?? 0],
+                      ].map(([label, key, min, max, step, value]) => (
+                        <label className="adjustment-row" key={String(key)}>
+                          <span>{label}<strong>{key === 'opacity' ? Math.round(Number(value) * 100) : Math.round(Number(value))}%</strong></span>
+                          <input
+                            id={`element-${String(key)}`}
+                            name={`element-${String(key)}`}
+                            type="range"
+                            min={Number(min)}
+                            max={Number(max)}
+                            step={Number(step)}
+                            value={Number(value)}
+                            onChange={(e) => updateSelected({ [key]: Number(e.target.value) } as Partial<EditorElement>)}
+                          />
+                        </label>
+                      ))}
+                      <button className="adjustment-reset" onClick={() => updateSelected({ opacity: 1, brightness: 100, contrast: 100, saturation: 100, grayscale: 0 })}>
+                        Reset adjustments
+                      </button>
+                    </div>
+                  )}
                   <button className="inspector-delete" onClick={removeSelected}><Trash2 size={15} /> Delete layer</button>
                 </>
               ) : (
