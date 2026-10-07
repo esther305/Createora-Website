@@ -532,7 +532,7 @@ function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
         <span className="studio-badge">STUDIO</span>
       </div>
 
-      <button className="studio-new-button" data-testid="button-dashboard-new-project" onClick={() => window.location.href = `${basePath}/editor`}>
+      <button className="studio-new-button" data-testid="button-dashboard-new-project" onClick={() => window.location.href = `${basePath}/projects?new=image`}>
         <span><Plus size={17} /></span>
         <strong>New project</strong>
         <kbd>⌘ N</kbd>
@@ -584,8 +584,104 @@ function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
   );
 }
 
+type CreateoraProject = {
+  id: string;
+  clerkUserId: string;
+  name: string;
+  type: string;
+  width: number | null;
+  height: number | null;
+  duration: number | null;
+  thumbnail: string | null;
+  document: unknown;
+  createdAt: string;
+  updatedAt: string;
+};
+const projectTypeLabel = (type: string) => type === 'video' ? 'VIDEO' : type === 'image' ? 'IMAGE' : 'DESIGN';
+const projectClassName = (type: string) => type === 'video' ? 'project-purple' : type === 'image' ? 'project-orange' : 'project-green';
+
+function ProjectsPage() {
+  const { isLoaded, isSignedIn, user, getToken } = useAuth();
+  const [, setLocation] = useLocation();
+  const [projects, setProjects] = useState<CreateoraProject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+
+  const loadProjects = async () => {
+    const token = await getToken();
+    const response = await fetch('/api/projects', { headers: token ? { Authorization: \`Bearer \${token}\` } : {} });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Unable to load projects');
+    setProjects(data.projects ?? []);
+  };
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+    setLoading(true);
+    void loadProjects().catch((err) => setError(err instanceof Error ? err.message : 'Unable to load projects')).finally(() => setLoading(false));
+  }, [isSignedIn]);
+
+  const createProject = async (type: 'image' | 'video') => {
+    if (creating) return;
+    setCreating(true);
+    setError('');
+    try {
+      const token = await getToken();
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: \`Bearer \${token}\` } : {}) },
+        body: JSON.stringify({ name: type === 'video' ? 'Untitled video' : 'Untitled design', type, width: type === 'video' ? 1920 : 1080, height: 1080 }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to create project');
+      setLocation(\`/editor?project=\${data.project.id}\`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to create project');
+      setCreating(false);
+    }
+  };
+
+  const deleteProject = async (project: CreateoraProject) => {
+    if (!window.confirm(\`Delete “\${project.name}”? This cannot be undone.\`)) return;
+    try {
+      const token = await getToken();
+      const response = await fetch(\`/api/projects/\${project.id}\`, { method: 'DELETE', headers: token ? { Authorization: \`Bearer \${token}\` } : {} });
+      if (!response.ok) { const data = await response.json(); throw new Error(data.error || 'Unable to delete project'); }
+      setProjects((current) => current.filter((item) => item.id !== project.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to delete project');
+    }
+  };
+
+  useEffect(() => {
+    const requestedType = new URLSearchParams(window.location.search).get('new');
+    if (requestedType && isSignedIn && !creating) void createProject(requestedType === 'video' ? 'video' : 'image');
+  }, [isSignedIn]);
+
+  if (!isLoaded) return <main className="projects-loading">Opening Projects…</main>;
+  if (!isSignedIn) return <Redirect to="/sign-in" />;
+
+  const visibleProjects = projects.filter((project) => project.name.toLowerCase().includes(search.trim().toLowerCase()));
+
+  return (
+    <main className="projects-page">
+      <header className="projects-header"><div className="projects-header-left"><button className="projects-back" onClick={() => setLocation('/dashboard')} aria-label="Back to dashboard"><ArrowRight size={16} /></button><Wordmark /><span className="projects-divider" /><div><span className="projects-kicker">WORKSPACE</span><strong>Projects</strong></div></div><div className="projects-header-actions"><span className="projects-user">{user?.firstName?.[0] ?? 'C'}</span></div></header>
+      <section className="projects-main">
+        <div className="projects-hero"><div><span className="eyebrow">02 · Your work</span><h1>Everything you create,<br /><span>in one place.</span></h1><p>Projects are saved to your workspace automatically. Open a project anytime and keep editing where you left off.</p></div>
+          <div className="projects-create-grid"><button className="project-create-card image" onClick={() => void createProject('image')} disabled={creating}><span><ImagePlus size={20} /></span><strong>New image</strong><small>1080 × 1080 canvas</small><ArrowUpRight size={16} /></button><button className="project-create-card video" onClick={() => void createProject('video')} disabled={creating}><span><Video size={20} /></span><strong>New video</strong><small>1920 × 1080 canvas</small><ArrowUpRight size={16} /></button></div>
+        </div>
+        <div className="projects-toolbar"><div><span className="projects-count">{projects.length}</span> {projects.length === 1 ? 'project' : 'projects'}</div><label><Target size={14} /><input id="projects-search" name="projects-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search projects…" /></label></div>
+        {error && <div className="projects-error">{error}</div>}
+        {loading ? <div className="projects-grid">{Array.from({ length: 6 }).map((_, index) => <div className="project-card-skeleton" key={index} />)}</div> : visibleProjects.length ? <div className="projects-grid">{visibleProjects.map((project) => <article className="workspace-project-card" key={project.id}><button className={\`workspace-project-art \${projectClassName(project.type)}\`} onClick={() => setLocation(\`/editor?project=\${project.id}\`)} aria-label={\`Open \${project.name}\`}><span>{projectTypeLabel(project.type)}</span><div className="workspace-art-shape" /></button><div className="workspace-project-meta"><button onClick={() => setLocation(\`/editor?project=\${project.id}\`)}><strong>{project.name}</strong><small>{project.width ?? 1080} × {project.height ?? 1080} · {new Date(project.updatedAt).toLocaleDateString()}</small></button><button className="workspace-project-delete" onClick={() => void deleteProject(project)} aria-label={\`Delete \${project.name}\`}><Trash2 size={15} /></button></div></article>)}</div> : <div className="projects-empty"><div><FolderKanban size={22} /></div><strong>No projects yet</strong><span>Create your first image or video project above. Your work will stay saved in your workspace.</span><button onClick={() => void createProject('image')}><Plus size={14} /> Create project</button></div>}
+      </section>
+    </main>
+  );
+}
+
 function DashboardPage() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
   const { signOut } = useClerk();
   const [, setLocation] = useLocation();
@@ -601,15 +697,21 @@ function DashboardPage() {
   const quickCreate: Array<{ title: string; description: string; icon: ReactNode; className: string; action?: () => void }> = [
     { title: 'AI Image', description: 'Generate a visual from a prompt', icon: <ImagePlus size={22} />, className: 'image' },
     { title: 'AI Video', description: 'Turn an idea into motion', icon: <Video size={22} />, className: 'video' },
-    { title: 'New Design', description: 'Start with a blank canvas', icon: <PenLine size={22} />, className: 'design', action: () => setLocation('/editor') },
+    { title: 'New Design', description: 'Start with a blank canvas', icon: <PenLine size={22} />, className: 'design', action: () => setLocation('/projects?new=image') },
     { title: 'Script', description: 'Write your next story', icon: <FileText size={22} />, className: 'script' },
   ];
 
-  const recentProjects = [
-    { name: 'Sunday campaign', type: 'Social campaign', time: 'Edited today', className: 'project-green', tag: 'DESIGN' },
-    { name: 'Field notes', type: 'Brand story', time: 'Edited yesterday', className: 'project-purple', tag: 'VIDEO' },
-    { name: 'Launch visuals', type: 'Product launch', time: 'Edited 3 days ago', className: 'project-orange', tag: 'IMAGE' },
-  ];
+  const [recentProjects, setRecentProjects] = useState<CreateoraProject[]>([]);
+  useEffect(() => {
+    if (!isSignedIn) return;
+    void (async () => {
+      try {
+        const token = await getToken();
+        const response = await fetch('/api/projects', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        if (response.ok) { const data = await response.json(); setRecentProjects((data.projects ?? []).slice(0, 3)); }
+      } catch {}
+    })();
+  }, [isSignedIn]);
 
   return (
     <main className="studio-shell">
@@ -680,21 +782,18 @@ function DashboardPage() {
                 <a href="#projects">View all <ArrowRight size={14} /></a>
               </div>
               <div className="studio-project-grid">
-                {recentProjects.map((project) => (
-                  <button className="studio-project-card" key={project.name}>
-                    <div className={`studio-project-art ${project.className}`}>
-                      <span>{project.tag}</span>
-                      <div className="studio-art-shape" />
-                    </div>
-                    <div className="studio-project-meta">
-                      <div><strong>{project.name}</strong><small>{project.type} · {project.time}</small></div>
-                      <MoreHorizontal size={16} />
-                    </div>
+                {recentProjects.length ? recentProjects.map((project) => (
+                  <button className="studio-project-card" key={project.id} onClick={() => setLocation(\`/editor?project=\${project.id}\`)}>
+                    <div className={\`studio-project-art \${projectClassName(project.type)}\`}><span>{projectTypeLabel(project.type)}</span><div className="studio-art-shape" /></div>
+                    <div className="studio-project-meta"><div><strong>{project.name}</strong><small>{project.width ?? 1080} × {project.height ?? 1080} · {new Date(project.updatedAt).toLocaleDateString()}</small></div><MoreHorizontal size={16} /></div>
                   </button>
-                ))}
+                )) : (
+                  <button className="studio-project-card studio-project-empty-card" onClick={() => setLocation('/projects?new=image')}>
+                    <div className="studio-project-art project-green"><span>START</span><div className="studio-art-shape" /></div>
+                    <div className="studio-project-meta"><div><strong>Create your first project</strong><small>Your saved projects will appear here.</small></div><ArrowRight size={16} /></div>
+                  </button>
+                )}
               </div>
-            </section>
-
             <aside className="studio-side-stack">
               <section className="studio-panel" id="ai-studio">
                 <div className="studio-panel-top"><span className="studio-panel-icon"><Sparkles size={17} /></span><span>AI Studio</span><span className="studio-live-pill">LIVE</span></div>
@@ -788,8 +887,66 @@ function CreateoraEditor() {
   const [future, setFuture] = useState<EditorElement[][]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
+  const [projectName, setProjectName] = useState('Untitled design');
+  const [projectId, setProjectId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('project'));
+  const [projectReady, setProjectReady] = useState(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selected = elements.find((element) => element.id === selectedId);
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await getToken();
+        if (!token) throw new Error('Your session expired. Please sign in again.');
+        const requestedId = new URLSearchParams(window.location.search).get('project');
+        if (requestedId) {
+          const response = await fetch(\`/api/projects/\${requestedId}\`, { headers: { Authorization: \`Bearer \${token}\` } });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Unable to open project');
+          const savedElements = Array.isArray(data.project.document?.elements) ? data.project.document.elements : [];
+          if (!cancelled) {
+            setProjectId(data.project.id);
+            setProjectName(data.project.name);
+            setElements(savedElements);
+            setProjectReady(true);
+          }
+          return;
+        }
+        const response = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: \`Bearer \${token}\` }, body: JSON.stringify({ name: 'Untitled design', type: 'image', width: 1080, height: 1080 }) });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to create project');
+        if (!cancelled) {
+          setProjectId(data.project.id);
+          setProjectName(data.project.name);
+          setProjectReady(true);
+          setLocation(\`/editor?project=\${data.project.id}\`);
+        }
+      } catch (error) {
+        if (!cancelled) window.alert(error instanceof Error ? error.message : 'Unable to open project');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isSignedIn]);
+
+  useEffect(() => {
+    if (!projectReady || !projectId) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      void (async () => {
+        try {
+          const token = await getToken();
+          if (!token) return;
+          await fetch(\`/api/projects/\${projectId}\`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: \`Bearer \${token}\` }, body: JSON.stringify({ name: projectName, document: { version: 1, elements } }) });
+        } catch {}
+      })();
+    }, 650);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [elements, projectName, projectId, projectReady]);
+
+
 
   const generateAIImage = async () => {
     if (!aiPrompt.trim() || aiLoading) return;
@@ -1012,7 +1169,7 @@ function CreateoraEditor() {
           <button className="editor-back" onClick={() => setLocation('/dashboard')}><ArrowRight size={17} /></button>
           <Wordmark />
           <span className="editor-divider" />
-          <div className="editor-project-name"><strong>Untitled design</strong><small>Saved locally</small></div>
+          <div className="editor-project-name"><strong>{projectName}</strong><small>{projectReady ? 'Saved to workspace' : 'Creating project…'}</small></div>
         </div>
         <div className="editor-top-center">
           <button onClick={undo} disabled={!history.length} aria-label="Undo"><Undo2 size={16} /></button>
@@ -1228,6 +1385,7 @@ function AppRoutes() {
         <Route path="/forgot-password" component={ForgotPasswordPage} />
         <Route path="/dashboard" component={DashboardPage} />
         <Route path="/assets" component={MediaLibraryPage} />
+        <Route path="/projects" component={ProjectsPage} />
         <Route path="/editor" component={CreateoraEditor} />
         <Route component={NotFound} />
       </Switch>
