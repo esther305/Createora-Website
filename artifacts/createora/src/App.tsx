@@ -3,7 +3,11 @@ import { upload } from '@vercel/blob/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useSignIn, useUser } from '@clerk/react';
 import { shadcn } from '@clerk/themes';
-import { getGetProfileQueryKey, useGetProfile } from '@workspace/api-client-react';
+import {
+  getGetProfileQueryKey,
+  useGetProfile,
+  setAuthTokenGetter,
+} from '@workspace/api-client-react';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -735,9 +739,24 @@ function Home() {
 
 function ClerkQueryClientCacheInvalidator() {
   const { addListener } = useClerk();
-  useEffect(() => addListener(({ user }) => {
-    if (!user) queryClient.clear();
-  }), [addListener]);
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    setAuthTokenGetter(getToken);
+
+    return () => {
+      setAuthTokenGetter(null);
+    };
+  }, [getToken]);
+
+  useEffect(
+    () =>
+      addListener(({ user }) => {
+        if (!user) queryClient.clear();
+      }),
+    [addListener],
+  );
+
   return null;
 }
 
