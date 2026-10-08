@@ -1,6 +1,6 @@
 import { db, aiGenerationsTable, assetsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { put } from "@vercel/blob";
+import { getCloudinary } from "../lib/cloudinary";
 import { Router, type IRouter } from "express";
 import { getAuth } from "@clerk/express";
 import { InferenceClient } from "@huggingface/inference";
@@ -116,16 +116,17 @@ const persistGeneratedImage = async (
         ? "webp"
         : "png";
 
-  const blob = await put(
-    `users/${userId}/ai/${crypto.randomUUID()}.${extension}`,
-    buffer,
-    {
-      access: "public",
-      contentType: mimeType,
-      addRandomSuffix: true,
-      cacheControlMaxAge: 31536000,
-    },
-  );
+  const { client: cloudinary } = getCloudinary();
+  const publicId = `createora/${userId}/ai/${crypto.randomUUID()}`;
+
+  const uploadResult = await cloudinary.uploader.upload(image, {
+    public_id: publicId,
+    resource_type: "image",
+    type: "upload",
+    overwrite: false,
+    invalidate: false,
+    format: extension,
+  });
 
   const assetId = crypto.randomUUID();
 
@@ -134,22 +135,24 @@ const persistGeneratedImage = async (
     clerkUserId: userId,
     name: `AI ${provider} · ${prompt.slice(0, 70)}`,
     type: "image",
-    mimeType,
-    url: blob.url,
-    storageKey: blob.pathname,
+    mimeType: uploadResult.format
+      ? `image/${uploadResult.format === "jpg" ? "jpeg" : uploadResult.format}`
+      : mimeType,
+    url: uploadResult.secure_url,
+    storageKey: uploadResult.public_id,
     source: "ai",
-    width,
-    height,
-    size: buffer.byteLength,
+    width: uploadResult.width ?? width,
+    height: uploadResult.height ?? height,
+    size: uploadResult.bytes ?? buffer.byteLength,
   });
 
   return {
     assetId,
-    url: blob.url,
+    url: uploadResult.secure_url,
     mimeType,
-    width,
-    height,
-    size: buffer.byteLength,
+    width: uploadResult.width ?? width,
+    height: uploadResult.height ?? height,
+    size: uploadResult.bytes ?? buffer.byteLength,
   };
 };
 
