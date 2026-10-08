@@ -76,7 +76,6 @@
   },
   "dependencies": {
     "@clerk/react": "^6.14.1",
-    "@clerk/themes": "^2.4.57",
-    "@vercel/blob": "^2.8.0"
+    "@clerk/themes": "^2.4.57"
   }
 }
