@@ -866,6 +866,14 @@ type EditorElement = {
   width: number;
   height: number;
   rotation: number;
+  startTime?: number;
+  duration?: number;
+  trimStart?: number;
+  trimEnd?: number;
+  speed?: number;
+  volume?: number;
+  fadeIn?: number;
+  fadeOut?: number;
   text?: string;
   color?: string;
   src?: string;
@@ -899,6 +907,11 @@ function CreateoraEditor() {
   const [projectId, setProjectId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('project'));
   const [projectReady, setProjectReady] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [timelineOpen, setTimelineOpen] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [timelineDuration, setTimelineDuration] = useState(30);
+  const playTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const selected = elements.find((element) => element.id === selectedId);
 
@@ -963,6 +976,36 @@ function CreateoraEditor() {
     })();
     return () => { cancelled = true; };
   }, [isSignedIn]);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      if (playTimerRef.current) clearInterval(playTimerRef.current);
+      return;
+    }
+    playTimerRef.current = setInterval(() => {
+      setCurrentTime((time) => {
+        if (time >= timelineDuration) {
+          setIsPlaying(false);
+          return 0;
+        }
+        return Math.min(timelineDuration, time + 0.1);
+      });
+    }, 100);
+    return () => {
+      if (playTimerRef.current) clearInterval(playTimerRef.current);
+    };
+  }, [isPlaying, timelineDuration]);
+
+  useEffect(() => {
+    const durations = elements
+      .filter((element) => element.type === 'video' && element.duration)
+      .map((element) => (element.startTime ?? 0) + (element.duration ?? 0));
+    if (durations.length) setTimelineDuration(Math.max(30, Math.ceil(Math.max(...durations))));
+  }, [elements]);
+
+  useEffect(() => {
+    if (currentTime > timelineDuration) setCurrentTime(timelineDuration);
+  }, [currentTime, timelineDuration]);
 
   useEffect(() => {
     if (!projectReady || !projectId) return;
@@ -1171,6 +1214,43 @@ function CreateoraEditor() {
     }
   };
 
+  const videoElements = elements.filter((element) => element.type === 'video');
+  const selectedVideo = selected?.type === 'video' ? selected : null;
+
+  const setClipTime = (id: string, patch: Partial<EditorElement>) => {
+    commit(elements.map((element) => element.id === id ? { ...element, ...patch } : element));
+  };
+
+  const duplicateSelected = () => {
+    if (!selected) return;
+    const copy = {
+      ...selected,
+      id: crypto.randomUUID(),
+      x: Math.min(900 - selected.width, selected.x + 24),
+      y: Math.min(600 - selected.height, selected.y + 24),
+      startTime: selected.startTime != null ? selected.startTime + 1 : undefined,
+    };
+    addElement(copy);
+  };
+
+  const splitSelectedClip = () => {
+    if (!selectedVideo) return;
+    const start = selectedVideo.startTime ?? 0;
+    const duration = selectedVideo.duration ?? 5;
+    const splitAt = Math.max(0.5, Math.min(duration - 0.5, currentTime - start));
+    if (splitAt <= 0.5 || splitAt >= duration - 0.5) return;
+    const first = { ...selectedVideo, duration: splitAt, trimEnd: (selectedVideo.trimStart ?? 0) + splitAt };
+    const second = {
+      ...selectedVideo,
+      id: crypto.randomUUID(),
+      startTime: start + splitAt,
+      duration: duration - splitAt,
+      trimStart: (selectedVideo.trimStart ?? 0) + splitAt,
+    };
+    commit(elements.map((element) => element.id === selectedVideo.id ? first : element).concat(second));
+    setSelectedId(second.id);
+  };
+
   const updateSelected = (patch: Partial<EditorElement>) => {
     if (!selectedId) return;
     const next = elements.map((element) => element.id === selectedId ? { ...element, ...patch } : element);
@@ -1315,7 +1395,76 @@ function CreateoraEditor() {
             <span>Page 1 of 1</span>
             <span>•</span>
             <span>Autosave on</span>
+            <button className="timeline-toggle" onClick={() => setTimelineOpen((open) => !open)}>
+              <Video size={12} /> {timelineOpen ? 'Hide timeline' : 'Show timeline'}
+            </button>
           </footer>
+          {timelineOpen && (
+            <section className="editor-timeline" aria-label="Video timeline">
+              <div className="timeline-toolbar">
+                <div className="timeline-transport">
+                  <button onClick={() => setCurrentTime(0)} title="Jump to start">↤</button>
+                  <button className="timeline-play" onClick={() => setIsPlaying((playing) => !playing)} title={isPlaying ? 'Pause' : 'Play'}>
+                    {isPlaying ? 'Ⅱ' : <Play size={13} fill="currentColor" />}
+                  </button>
+                  <button onClick={() => setCurrentTime(Math.min(timelineDuration, currentTime + 5))}>+5s</button>
+                  <span className="timeline-time">{currentTime.toFixed(1)}s / {timelineDuration.toFixed(1)}s</span>
+                </div>
+                <div className="timeline-actions">
+                  <button onClick={duplicateSelected} disabled={!selected}>Duplicate</button>
+                  <button onClick={splitSelectedClip} disabled={!selectedVideo}>Split</button>
+                  <button onClick={() => selectedVideo && setClipTime(selectedVideo.id, { volume: Math.max(0, (selectedVideo.volume ?? 1) - 0.1) })} disabled={!selectedVideo}>− Vol</button>
+                  <button onClick={() => selectedVideo && setClipTime(selectedVideo.id, { volume: Math.min(1, (selectedVideo.volume ?? 1) + 0.1) })} disabled={!selectedVideo}>+ Vol</button>
+                </div>
+              </div>
+              <div className="timeline-ruler-wrap">
+                <div className="timeline-ruler">
+                  {Array.from({ length: Math.ceil(timelineDuration / 5) + 1 }, (_, index) => index * 5).map((second) => (
+                    <span key={second} style={{ left: (second / timelineDuration) * 100 + '%' }}>{second}s</span>
+                  ))}
+                </div>
+                <div
+                  className="timeline-scroll"
+                  onClick={(event) => {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+                    setCurrentTime(ratio * timelineDuration);
+                  }}
+                >
+                  <div className="timeline-playhead" style={{ left: (currentTime / timelineDuration) * 100 + '%' }}><i /></div>
+                  <div className="timeline-track-labels">
+                    <div className="timeline-track-label"><Layers3 size={12} /><span>Video</span></div>
+                    <div className="timeline-track-label"><span className="timeline-audio-dot" /><span>Audio</span></div>
+                  </div>
+                  <div className="timeline-tracks">
+                    <div className="timeline-track">
+                      {videoElements.length ? videoElements.map((clip, index) => {
+                        const start = clip.startTime ?? index * 5;
+                        const duration = clip.duration ?? 5;
+                        const left = (start / timelineDuration) * 100;
+                        const width = Math.max(5, (duration / timelineDuration) * 100);
+                        return (
+                          <button key={clip.id} className={selectedId === clip.id ? 'timeline-clip selected' : 'timeline-clip'} style={{ left: left + '%', width: width + '%' }} onClick={(event) => { event.stopPropagation(); setSelectedId(clip.id); setTool('select'); }}>
+                            <span className="timeline-clip-film" />
+                            <strong>Clip {index + 1}</strong>
+                            <small>{duration.toFixed(1)}s</small>
+                          </button>
+                        );
+                      }) : <div className="timeline-empty-track">Add a video to start editing motion</div>}
+                    </div>
+                    <div className="timeline-track audio-track">
+                      <div className="timeline-audio-placeholder"><span /><b>Audio track</b><small>Drop audio here</small></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="timeline-footer">
+                <span>{videoElements.length} video clip{videoElements.length === 1 ? '' : 's'}</span>
+                <span>Magnetic timeline</span>
+                <span>30 FPS</span>
+              </div>
+            </section>
+          )}
         </section>
 
         <aside className="editor-inspector">
@@ -1407,6 +1556,31 @@ function CreateoraEditor() {
                       <label>H<input id="element-height" name="element-height" type="number" value={Math.round(selected.height)} onChange={(e) => updateSelected({ height: Number(e.target.value) })} /></label>
                     </div>
                   </div>
+                  {selected.type === 'video' && (
+                    <>
+                      <div className="inspector-section video-clip-controls">
+                        <div className="inspector-section-title">Timeline</div>
+                        <div className="clip-control-grid">
+                          <label>Start<input type="number" min="0" step="0.1" value={selected.startTime ?? 0} onChange={(e) => updateSelected({ startTime: Math.max(0, Number(e.target.value)) })} /></label>
+                          <label>Duration<input type="number" min="0.1" step="0.1" value={selected.duration ?? 5} onChange={(e) => updateSelected({ duration: Math.max(0.1, Number(e.target.value)) })} /></label>
+                          <label>Trim in<input type="number" min="0" step="0.1" value={selected.trimStart ?? 0} onChange={(e) => updateSelected({ trimStart: Math.max(0, Number(e.target.value)) })} /></label>
+                          <label>Trim out<input type="number" min="0" step="0.1" value={selected.trimEnd ?? ((selected.trimStart ?? 0) + (selected.duration ?? 5))} onChange={(e) => updateSelected({ trimEnd: Math.max(0, Number(e.target.value)) })} /></label>
+                        </div>
+                      </div>
+                      <div className="inspector-section">
+                        <label>Speed</label>
+                        <div className="video-speed-grid">
+                          {[0.5, 1, 1.5, 2].map((speed) => (
+                            <button key={speed} className={(selected.speed ?? 1) === speed ? 'active' : ''} onClick={() => updateSelected({ speed })}>{speed}×</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="inspector-section">
+                        <label>Volume</label>
+                        <div className="inspector-slider"><Video size={14} /><input id="video-volume" name="video-volume" type="range" min="0" max="1" step="0.05" value={selected.volume ?? 1} onChange={(e) => updateSelected({ volume: Number(e.target.value) })} /><span>{Math.round((selected.volume ?? 1) * 100)}%</span></div>
+                      </div>
+                    </>
+                  )}
                   <div className="inspector-section">
                     <label>Rotation</label>
                     <div className="inspector-slider"><RotateCw size={14} /><input id="element-rotation" name="element-rotation" type="range" min="-180" max="180" value={selected.rotation} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} /><span>{selected.rotation}°</span></div>
