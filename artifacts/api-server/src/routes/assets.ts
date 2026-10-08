@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { getAuth } from "@clerk/express";
 import { db, assetsTable } from "@workspace/db";
 import { and, desc, eq, ilike } from "drizzle-orm";
-import { v2 as cloudinary } from "cloudinary";
+import { getCloudinary } from "../lib/cloudinary";
 
 const router: IRouter = Router();
 
@@ -36,21 +36,6 @@ const cloudinaryResourceTypeFromMime = (mimeType: string) => {
   return "raw";
 };
 
-const getCloudinaryConfig = () => {
-  const config = cloudinary.config();
-  const cloudName = config.cloud_name;
-  const apiKey = config.api_key;
-  const apiSecret = config.api_secret;
-
-  if (!cloudName || !apiKey || !apiSecret) {
-    throw new Error(
-      "Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET (or CLOUDINARY_URL).",
-    );
-  }
-
-  return { cloudName, apiKey, apiSecret };
-};
-
 router.post("/assets/cloudinary/signature", async (req, res) => {
   const { userId } = getAuth(req);
 
@@ -71,7 +56,7 @@ router.post("/assets/cloudinary/signature", async (req, res) => {
   }
 
   try {
-    const { cloudName, apiKey, apiSecret } = getCloudinaryConfig();
+    const { client: cloudinary, cloudName, apiKey, apiSecret } = getCloudinary();
     const timestamp = Math.floor(Date.now() / 1000);
     const publicId = `createora/${userId}/${crypto.randomUUID()}`;
 
@@ -151,7 +136,7 @@ router.post("/assets/cloudinary/finalize", async (req, res) => {
   }
 
   try {
-    const { cloudName, apiKey } = getCloudinaryConfig();
+    const { client: cloudinary, cloudName, apiKey } = getCloudinary();
 
     const expectedPrefix = `https://res.cloudinary.com/${cloudName}/`;
     if (!secureUrl.startsWith(expectedPrefix)) {
@@ -302,7 +287,7 @@ router.delete("/assets/:id", async (req, res) => {
     }
 
     if (asset.storageKey && asset.storageKey.startsWith(`createora/${userId}/`)) {
-      const { apiKey } = getCloudinaryConfig();
+      const { client: cloudinary, apiKey } = getCloudinary();
       const resourceType =
         asset.type === "image" ? "image" : "video";
 
