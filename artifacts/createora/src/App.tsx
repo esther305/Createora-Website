@@ -878,7 +878,7 @@ function ClerkQueryClientCacheInvalidator() {
 
 type EditorElement = {
   id: string;
-  type: 'text' | 'shape' | 'image';
+  type: 'text' | 'shape' | 'image' | 'video';
   x: number;
   y: number;
   width: number;
