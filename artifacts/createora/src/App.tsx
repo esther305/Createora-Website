@@ -903,6 +903,22 @@ function CreateoraEditor() {
   const [future, setFuture] = useState<EditorElement[][]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
+  const transformRef = useRef<{
+    mode: 'resize' | 'rotate';
+    id: string;
+    handle?: string;
+    startX: number;
+    startY: number;
+    startWidth: number;
+    startHeight: number;
+    startLeft: number;
+    startTop: number;
+    startRotation: number;
+    centerX: number;
+    centerY: number;
+    startAngle: number;
+  } | null>(null);
+  const interactionStartRef = useRef<EditorElement[] | null>(null);
   const [projectName, setProjectName] = useState('Untitled design');
   const [projectId, setProjectId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('project'));
   const [projectReady, setProjectReady] = useState(false);
@@ -1287,6 +1303,7 @@ function CreateoraEditor() {
     setSelectedId(element.id);
     const rect = (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect();
     if (!rect) return;
+    interactionStartRef.current = elements;
     dragRef.current = {
       id: element.id,
       offsetX: event.clientX - rect.left - element.x * (zoom / 100),
@@ -1295,22 +1312,155 @@ function CreateoraEditor() {
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   };
 
-  const handlePointerMove = (event: React.PointerEvent) => {
-    if (!dragRef.current) return;
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  const handleResizePointerDown = (event: PointerEvent, element: EditorElement, handle: string) => {
+    if (tool !== 'select') return;
+    event.stopPropagation();
+    event.preventDefault();
+    setSelectedId(element.id);
+    interactionStartRef.current = elements;
+    const rect = (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect();
+    if (!rect) return;
     const scale = zoom / 100;
-    const x = Math.max(0, Math.min(900 - (selected?.width ?? 100), (event.clientX - rect.left - dragRef.current.offsetX) / scale));
-    const y = Math.max(0, Math.min(600 - (selected?.height ?? 80), (event.clientY - rect.top - dragRef.current.offsetY) / scale));
-    setElements((current) => current.map((item) => item.id === dragRef.current?.id ? { ...item, x, y } : item));
+    const left = element.x * scale;
+    const top = element.y * scale;
+    const width = element.width * scale;
+    const height = element.height * scale;
+    transformRef.current = {
+      mode: 'resize',
+      id: element.id,
+      handle,
+      startX: event.clientX,
+      startY: event.clientY,
+      startWidth: width,
+      startHeight: height,
+      startLeft: left,
+      startTop: top,
+      startRotation: element.rotation,
+      centerX: left + width / 2,
+      centerY: top + height / 2,
+      startAngle: 0,
+    };
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  };
+
+  const handleRotatePointerDown = (event: PointerEvent, element: EditorElement) => {
+    if (tool !== 'select') return;
+    event.stopPropagation();
+    event.preventDefault();
+    setSelectedId(element.id);
+    interactionStartRef.current = elements;
+    const elementRect = (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect();
+    const canvasRect = elementRect?.parentElement?.getBoundingClientRect();
+    if (!canvasRect) return;
+    const scale = zoom / 100;
+    const centerX = element.x * scale + element.width * scale / 2;
+    const centerY = element.y * scale + element.height * scale / 2;
+    transformRef.current = {
+      mode: 'rotate',
+      id: element.id,
+      startX: event.clientX,
+      startY: event.clientY,
+      startWidth: element.width * scale,
+      startHeight: element.height * scale,
+      startLeft: element.x * scale,
+      startTop: element.y * scale,
+      startRotation: element.rotation,
+      centerX,
+      centerY,
+      startAngle: Math.atan2(
+        event.clientY - canvasRect.top - centerY,
+        event.clientX - canvasRect.left - centerX,
+      ),
+    };
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent) => {
+    const transform = transformRef.current;
+    const drag = dragRef.current;
+    const canvas = event.currentTarget as HTMLElement;
+    const rect = canvas.getBoundingClientRect();
+    const scale = zoom / 100;
+
+    if (transform?.mode === 'rotate') {
+      const angle = Math.atan2(
+        event.clientY - rect.top - transform.centerY,
+        event.clientX - rect.left - transform.centerX,
+      );
+      const rotation = Math.round(
+        transform.startRotation + (angle - transform.startAngle) * (180 / Math.PI),
+      );
+      setElements((current) => current.map((item) =>
+        item.id === transform.id ? { ...item, rotation } : item,
+      ));
+      return;
+    }
+
+    if (transform?.mode === 'resize') {
+      const dx = (event.clientX - transform.startX) / scale;
+      const dy = (event.clientY - transform.startY) / scale;
+      const handle = transform.handle ?? '';
+      const minSize = 32;
+      const startWidth = transform.startWidth / scale;
+      const startHeight = transform.startHeight / scale;
+      let x = transform.startLeft / scale;
+      let y = transform.startTop / scale;
+      let width = startWidth;
+      let height = startHeight;
+
+      if (handle.includes('e')) width = Math.max(minSize, startWidth + dx);
+      if (handle.includes('s')) height = Math.max(minSize, startHeight + dy);
+      if (handle.includes('w')) {
+        width = Math.max(minSize, startWidth - dx);
+        x = transform.startLeft / scale + dx;
+      }
+      if (handle.includes('n')) {
+        height = Math.max(minSize, startHeight - dy);
+        y = transform.startTop / scale + dy;
+      }
+
+      if (event.shiftKey) {
+        const aspect = startWidth / Math.max(startHeight, 1);
+        if (handle.includes('e') || handle.includes('w')) {
+          height = Math.max(minSize, width / aspect);
+          if (handle.includes('n')) y = transform.startTop / scale + (startHeight - height);
+        } else {
+          width = Math.max(minSize, height * aspect);
+          if (handle.includes('w')) x = transform.startLeft / scale + (startWidth - width);
+        }
+      }
+
+      x = Math.max(0, Math.min(900 - minSize, x));
+      y = Math.max(0, Math.min(600 - minSize, y));
+      width = Math.min(width, 900 - x);
+      height = Math.min(height, 600 - y);
+
+      setElements((current) => current.map((item) =>
+        item.id === transform.id ? { ...item, x, y, width: Math.max(minSize, width), height: Math.max(minSize, height) } : item,
+      ));
+      return;
+    }
+
+    if (!drag) return;
+    const x = Math.max(0, Math.min(900 - (selected?.width ?? 100), (event.clientX - rect.left - drag.offsetX) / scale));
+    const y = Math.max(0, Math.min(600 - (selected?.height ?? 80), (event.clientY - rect.top - drag.offsetY) / scale));
+    setElements((current) => current.map((item) => item.id === drag.id ? { ...item, x, y } : item));
   };
 
   const finishDrag = () => {
-    if (!dragRef.current) return;
-    const current = elements;
-    setHistory((h) => [...h.slice(-19), current]);
-    setFuture([]);
+    if (!dragRef.current && !transformRef.current) return;
+    if (interactionStartRef.current) {
+      const start = interactionStartRef.current;
+      if (JSON.stringify(start) !== JSON.stringify(elements)) {
+        setHistory((h) => [...h.slice(-19), start]);
+        setFuture([]);
+      }
+    }
     dragRef.current = null;
+    transformRef.current = null;
+    interactionStartRef.current = null;
   };
+
 
   return (
     <main className="createora-editor">
@@ -1379,7 +1529,29 @@ function CreateoraEditor() {
                   {element.type === 'text' && <span>{element.text}</span>}
                   {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} />}
                   {element.type === 'video' && element.src && <video src={element.src} muted playsInline preload="metadata" draggable={false} />}
-                  {selectedId === element.id && <span className="editor-selection-label">{element.type.toUpperCase()}</span>}
+                  {selectedId === element.id && (
+                    <>
+                      <span className="editor-selection-label">{element.type.toUpperCase()}</span>
+                      <span className="editor-rotate-stem" aria-hidden="true" />
+                      <button
+                        type="button"
+                        className="editor-rotate-handle"
+                        aria-label="Rotate selected element"
+                        onPointerDown={(event) => handleRotatePointerDown(event, element)}
+                      >
+                        <RotateCw size={12} />
+                      </button>
+                      {['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map((handle) => (
+                        <button
+                          key={handle}
+                          type="button"
+                          className={`editor-resize-handle editor-resize-${handle}`}
+                          aria-label={`Resize ${handle}`}
+                          onPointerDown={(event) => handleResizePointerDown(event, element, handle)}
+                        />
+                      ))}
+                    </>
+                  )}
                 </div>
               ))}
               {!elements.length && (
