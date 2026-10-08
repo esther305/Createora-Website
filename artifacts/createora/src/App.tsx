@@ -1118,47 +1118,50 @@ function CreateoraEditor() {
         throw new Error('Your session expired. Please sign in again.');
       }
 
-      const image = new Image();
-      const objectUrl = URL.createObjectURL(file);
+      let metadata: CloudinaryUploadMetadata;
 
-      try {
-        image.src = objectUrl;
+      if (file.type.startsWith('image/')) {
+        const objectUrl = URL.createObjectURL(file);
+        try {
+          const image = new Image();
+          image.src = objectUrl;
 
-        await new Promise<void>((resolve, reject) => {
-          image.onload = () => resolve();
-          image.onerror = () => reject(new Error('Unable to read uploaded image'));
-        });
+          await new Promise<void>((resolve, reject) => {
+            image.onload = () => resolve();
+            image.onerror = () => reject(new Error('Unable to read uploaded image'));
+          });
 
-        const metadata = file.type.startsWith('image/')
-          ? {
-              width: image.naturalWidth || null,
-              height: image.naturalHeight || null,
-            }
-          : await getBrowserMediaMetadata(file);
-
-        const asset = await uploadAssetToCloudinary(file, token, metadata);
-
-        const isVideo = file.type.startsWith('video/');
-        const sourceWidth = asset.width || metadata.width || 720;
-        const sourceHeight = asset.height || metadata.height || (isVideo ? 405 : 720);
-        const maxWidth = 520;
-        const scale = Math.min(1, maxWidth / sourceWidth);
-        const width = Math.round(sourceWidth * scale);
-        const height = Math.round(sourceHeight * scale);
-
-        addElement({
-          id: crypto.randomUUID(),
-          type: isVideo ? 'video' : 'image',
-          x: Math.round((900 - width) / 2),
-          y: Math.round((600 - height) / 2),
-          width,
-          height,
-          rotation: 0,
-          src: asset.url,
-        });
-      } finally {
-        URL.revokeObjectURL(objectUrl);
+          metadata = {
+            width: image.naturalWidth || null,
+            height: image.naturalHeight || null,
+          };
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
+      } else {
+        metadata = await getBrowserMediaMetadata(file);
       }
+
+      const asset = await uploadAssetToCloudinary(file, token, metadata);
+
+      const isVideo = file.type.startsWith('video/');
+      const sourceWidth = asset.width || metadata.width || 720;
+      const sourceHeight = asset.height || metadata.height || (isVideo ? 405 : 720);
+      const maxWidth = 520;
+      const scale = Math.min(1, maxWidth / sourceWidth);
+      const width = Math.round(sourceWidth * scale);
+      const height = Math.round(sourceHeight * scale);
+
+      addElement({
+        id: crypto.randomUUID(),
+        type: isVideo ? 'video' : 'image',
+        x: Math.round((900 - width) / 2),
+        y: Math.round((600 - height) / 2),
+        width,
+        height,
+        rotation: 0,
+        src: asset.url,
+      });
     } catch (error) {
       window.alert(
         error instanceof Error ? error.message : 'Unable to upload image',
