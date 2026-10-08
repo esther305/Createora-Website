@@ -35,13 +35,6 @@ app.use(
 );
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 app.use(cors({ credentials: true, origin: true }));
-app.use(
-  "/api/assets/upload-direct",
-  express.raw({
-    type: "*/*",
-    limit: "500mb",
-  }),
-);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(
