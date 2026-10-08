@@ -1593,50 +1593,163 @@ async function uploadAssetDirect(
   token: string,
   metadata: DirectUploadMetadata = {},
 ) {
-  const response = await fetch('/api/assets/upload-direct', {
+  const signatureResponse = await fetch('/api/assets/cloudinary/signature', {
     method: 'POST',
     headers: {
       Accept: 'application/json',
       Authorization: `Bearer ${token}`,
-      'Content-Type': file.type,
-      'X-Asset-Name': encodeURIComponent(file.name),
-      'X-Asset-Size': String(file.size),
-      'X-Asset-Width': metadata.width == null ? '' : String(metadata.width),
-      'X-Asset-Height': metadata.height == null ? '' : String(metadata.height),
-      'X-Asset-Duration':
-        metadata.duration == null ? '' : String(metadata.duration),
+      'Content-Type': 'application/json',
     },
-    body: file,
+    body: JSON.stringify({
+      contentType: file.type,
+    }),
   });
 
-  const raw = await response.text();
+  const signatureRaw = await signatureResponse.text();
 
-  let data: {
-    asset?: MediaAsset;
+  let signatureData: {
+    cloudName?: string;
+    apiKey?: string;
+    publicId?: string;
+    timestamp?: number;
+    signature?: string;
+    resourceType?: string;
     error?: string;
   } = {};
 
-  if (raw.trim()) {
+  if (signatureRaw.trim()) {
     try {
-      data = JSON.parse(raw);
+      signatureData = JSON.parse(signatureRaw);
     } catch {
       throw new Error(
-        `Upload server returned an invalid response (HTTP ${response.status}).`,
+        `Cloudinary signature request returned an invalid response (HTTP ${signatureResponse.status}).`,
       );
     }
   }
 
-  if (!response.ok) {
+  if (!signatureResponse.ok) {
     throw new Error(
-      data.error || `Upload failed (HTTP ${response.status}).`,
+      signatureData.error ||
+        `Unable to prepare Cloudinary upload (HTTP ${signatureResponse.status}).`,
     );
   }
 
-  if (!data.asset) {
+  if (
+    !signatureData.cloudName ||
+    !signatureData.apiKey ||
+    !signatureData.publicId ||
+    signatureData.timestamp == null ||
+    !signatureData.signature ||
+    !signatureData.resourceType
+  ) {
+    throw new Error('Cloudinary upload configuration is incomplete.');
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('api_key', signatureData.apiKey);
+  formData.append('timestamp', String(signatureData.timestamp));
+  formData.append('signature', signatureData.signature);
+  formData.append('public_id', signatureData.publicId);
+
+  const cloudinaryResponse = await fetch(
+    `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/${signatureData.resourceType}/upload`,
+    {
+      method: 'POST',
+      body: formData,
+    },
+  );
+
+  const cloudinaryRaw = await cloudinaryResponse.text();
+
+  let cloudinaryData: {
+    secure_url?: string;
+    public_id?: string;
+    version?: number;
+    signature?: string;
+    bytes?: number;
+    error?: { message?: string };
+  } = {};
+
+  if (cloudinaryRaw.trim()) {
+    try {
+      cloudinaryData = JSON.parse(cloudinaryRaw);
+    } catch {
+      throw new Error(
+        `Cloudinary returned an invalid response (HTTP ${cloudinaryResponse.status}).`,
+      );
+    }
+  }
+
+  if (!cloudinaryResponse.ok) {
+    throw new Error(
+      cloudinaryData.error?.message ||
+        `Cloudinary upload failed (HTTP ${cloudinaryResponse.status}).`,
+    );
+  }
+
+  if (
+    !cloudinaryData.secure_url ||
+    !cloudinaryData.public_id ||
+    cloudinaryData.version == null ||
+    !cloudinaryData.signature
+  ) {
+    throw new Error(
+      'Cloudinary upload completed but returned incomplete metadata.',
+    );
+  }
+
+  const finalizeResponse = await fetch('/api/assets/cloudinary/finalize', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      publicId: cloudinaryData.public_id,
+      signature: cloudinaryData.signature,
+      version: cloudinaryData.version,
+      secureUrl: cloudinaryData.secure_url,
+      resourceType: signatureData.resourceType,
+      name: file.name,
+      mimeType: file.type,
+      width: metadata.width ?? null,
+      height: metadata.height ?? null,
+      duration: metadata.duration ?? null,
+      bytes: cloudinaryData.bytes ?? file.size,
+    }),
+  });
+
+  const finalizeRaw = await finalizeResponse.text();
+
+  let finalizeData: {
+    asset?: MediaAsset;
+    error?: string;
+  } = {};
+
+  if (finalizeRaw.trim()) {
+    try {
+      finalizeData = JSON.parse(finalizeRaw);
+    } catch {
+      throw new Error(
+        `Asset finalization returned an invalid response (HTTP ${finalizeResponse.status}).`,
+      );
+    }
+  }
+
+  if (!finalizeResponse.ok) {
+    throw new Error(
+      finalizeData.error ||
+        `Unable to save uploaded asset (HTTP ${finalizeResponse.status}).`,
+    );
+  }
+
+  if (!finalizeData.asset) {
     throw new Error('Upload completed but no asset was returned.');
   }
 
-  return data.asset;
+  return finalizeData.asset;
 }
 
 function RoutedErrorBoundary({ children }: { children: ReactNode }) {
