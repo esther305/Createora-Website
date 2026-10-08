@@ -1,9 +1,8 @@
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
-import { put, del } from "@vercel/blob";
 import { Router, type IRouter } from "express";
 import { getAuth } from "@clerk/express";
 import { db, assetsTable } from "@workspace/db";
 import { and, desc, eq, ilike } from "drizzle-orm";
+import { v2 as cloudinary } from "cloudinary";
 
 const router: IRouter = Router();
 
@@ -30,58 +29,29 @@ const assetTypeFromMime = (mimeType: string) => {
   return "other";
 };
 
-router.post("/assets/upload", async (req, res) => {
-  const { userId } = getAuth(req);
-
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-
-  try {
-    const body = (await req.body) as HandleUploadBody;
-    const response = await handleUpload({
-      body,
-      request: req,
-      onBeforeGenerateToken: async (pathname) => {
-        const expectedPrefix = `users/${userId}/`;
-        if (!pathname.startsWith(expectedPrefix)) {
-          throw new Error("Invalid asset upload path");
-        }
-
-        return {
-          allowedContentTypes,
-          maximumSizeInBytes: maxUploadBytes,
-          addRandomSuffix: true,
-          tokenPayload: JSON.stringify({ userId }),
-        };
-      },
-      onUploadCompleted: async () => {
-        // Database finalization happens through /assets/finalize so local
-        // development works without a public callback URL.
-      },
-    });
-
-    res.json(response);
-  } catch (error) {
-    req.log.error({ error, userId }, "Asset upload token request failed");
-    res.status(400).json({
-      error: error instanceof Error ? error.message : "Unable to prepare upload",
-    });
-  }
-});
-
-
-const getNumberHeader = (
-  value: string | string[] | undefined,
-): number | null => {
-  if (typeof value !== "string") return null;
-
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+const cloudinaryResourceTypeFromMime = (mimeType: string) => {
+  if (mimeType.startsWith("image/")) return "image";
+  // Cloudinary treats audio as the video resource type.
+  if (mimeType.startsWith("video/") || mimeType.startsWith("audio/")) return "video";
+  return "raw";
 };
 
-router.post("/assets/upload-direct", async (req, res) => {
+const getCloudinaryConfig = () => {
+  const config = cloudinary.config();
+  const cloudName = config.cloud_name;
+  const apiKey = config.api_key;
+  const apiSecret = config.api_secret;
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    throw new Error(
+      "Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET (or CLOUDINARY_URL).",
+    );
+  }
+
+  return { cloudName, apiKey, apiSecret };
+};
+
+router.post("/assets/cloudinary/signature", async (req, res) => {
   const { userId } = getAuth(req);
 
   if (!userId) {
@@ -89,97 +59,50 @@ router.post("/assets/upload-direct", async (req, res) => {
     return;
   }
 
-  const contentTypeHeader = req.headers["content-type"];
-  const contentType =
-    typeof contentTypeHeader === "string"
-      ? contentTypeHeader.split(";")[0].trim()
-      : "";
+  const mimeType = typeof req.body?.contentType === "string"
+    ? req.body.contentType
+    : "";
 
-  const nameHeader = req.headers["x-asset-name"];
-  const name =
-    typeof nameHeader === "string"
-      ? decodeURIComponent(nameHeader).trim()
-      : "";
-
-  const size =
-    getNumberHeader(req.headers["x-asset-size"]) ??
-    (typeof req.headers["content-length"] === "string"
-      ? Number(req.headers["content-length"])
-      : null);
-
-  const width = getNumberHeader(req.headers["x-asset-width"]);
-  const height = getNumberHeader(req.headers["x-asset-height"]);
-  const duration = getNumberHeader(req.headers["x-asset-duration"]);
-
-  if (!name) {
-    res.status(400).json({ error: "Asset filename is missing" });
-    return;
-  }
-
-  if (!contentType || !allowedContentTypes.includes(contentType)) {
+  if (!allowedContentTypes.includes(mimeType)) {
     res.status(400).json({
-      error: `Unsupported media type: ${contentType || "unknown"}`,
+      error: `Unsupported media type: ${mimeType || "unknown"}`,
     });
     return;
   }
-
-  if (!Buffer.isBuffer(req.body)) {
-    res.status(400).json({ error: "Upload body was not received as binary data" });
-    return;
-  }
-
-  if (req.body.length > maxUploadBytes) {
-    res.status(413).json({ error: "File is larger than the 500 MB upload limit" });
-    return;
-  }
-
-  const safeName = name.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-120);
-  const pathname = `users/${userId}/${crypto.randomUUID()}-${safeName}`;
 
   try {
-    req.log.info(
-      { userId, pathname, contentType, size: req.body.length },
-      "Uploading media directly to Blob",
+    const { cloudName, apiKey, apiSecret } = getCloudinaryConfig();
+    const timestamp = Math.floor(Date.now() / 1000);
+    const publicId = `createora/${userId}/${crypto.randomUUID()}`;
+
+    const signature = cloudinary.utils.api_sign_request(
+      {
+        public_id: publicId,
+        timestamp,
+      },
+      apiSecret,
     );
 
-    const blob = await put(pathname, req.body, {
-      access: "public",
-      contentType,
-      addRandomSuffix: false,
+    res.json({
+      cloudName,
+      apiKey,
+      publicId,
+      timestamp,
+      signature,
+      resourceType: cloudinaryResourceTypeFromMime(mimeType),
     });
-
-    const asset = {
-      id: crypto.randomUUID(),
-      clerkUserId: userId,
-      name: name.slice(0, 180),
-      type: assetTypeFromMime(contentType),
-      mimeType: contentType,
-      url: blob.url,
-      storageKey: blob.pathname,
-      source: "upload",
-      width,
-      height,
-      duration,
-      size: size ?? req.body.length,
-    };
-
-    await db.insert(assetsTable).values(asset);
-
-    req.log.info(
-      { userId, assetId: asset.id, url: asset.url },
-      "Media upload completed",
-    );
-
-    res.status(201).json({ asset });
   } catch (error) {
-    req.log.error({ error, userId }, "Direct media upload failed");
+    req.log.error({ error, userId }, "Failed to create Cloudinary upload signature");
     res.status(500).json({
-      error: error instanceof Error ? error.message : "Unable to upload media",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to prepare Cloudinary upload",
     });
   }
 });
 
-router.post("/assets/finalize", async (req, res) => {
+router.post("/assets/cloudinary/finalize", async (req, res) => {
   const { userId } = getAuth(req);
 
   if (!userId) {
@@ -188,21 +111,31 @@ router.post("/assets/finalize", async (req, res) => {
   }
 
   const body = req.body ?? {};
-  const pathname = typeof body.pathname === "string" ? body.pathname : "";
-  const url = typeof body.url === "string" ? body.url : "";
+  const publicId = typeof body.publicId === "string" ? body.publicId : "";
+  const responseSignature =
+    typeof body.signature === "string" ? body.signature : "";
+  const version = Number(body.version);
+  const secureUrl = typeof body.secureUrl === "string" ? body.secureUrl : "";
+  const resourceType =
+    typeof body.resourceType === "string" ? body.resourceType : "";
   const name = typeof body.name === "string" ? body.name.trim() : "";
-  const mimeType = typeof body.contentType === "string" ? body.contentType : "";
-  const size = Number.isFinite(body.size) ? Number(body.size) : null;
-  const width = Number.isFinite(body.width) ? Number(body.width) : null;
-  const height = Number.isFinite(body.height) ? Number(body.height) : null;
-  const duration = Number.isFinite(body.duration) ? Number(body.duration) : null;
+  const mimeType =
+    typeof body.mimeType === "string" ? body.mimeType : "";
 
-  if (!pathname || !url || !name || !mimeType) {
-    res.status(400).json({ error: "Asset metadata is incomplete" });
+  if (
+    !publicId ||
+    !responseSignature ||
+    !Number.isFinite(version) ||
+    !secureUrl ||
+    !resourceType ||
+    !name ||
+    !mimeType
+  ) {
+    res.status(400).json({ error: "Cloudinary asset metadata is incomplete" });
     return;
   }
 
-  if (!pathname.startsWith(`users/${userId}/`)) {
+  if (!publicId.startsWith(`createora/${userId}/`)) {
     res.status(403).json({ error: "You cannot finalize this asset" });
     return;
   }
@@ -212,16 +145,72 @@ router.post("/assets/finalize", async (req, res) => {
     return;
   }
 
+  if (!["image", "video", "raw"].includes(resourceType)) {
+    res.status(400).json({ error: "Unsupported Cloudinary resource type" });
+    return;
+  }
+
   try {
+    const { cloudName, apiKey } = getCloudinaryConfig();
+
+    const expectedPrefix = `https://res.cloudinary.com/${cloudName}/`;
+    if (!secureUrl.startsWith(expectedPrefix)) {
+      res.status(400).json({ error: "Invalid Cloudinary asset URL" });
+      return;
+    }
+
+    const verified = cloudinary.utils.verify_api_response_signature(
+      { public_id: publicId, version },
+      responseSignature,
+    );
+
+    if (!verified) {
+      res.status(400).json({ error: "Cloudinary asset verification failed" });
+      return;
+    }
+
+    if (resourceType === "image" && !mimeType.startsWith("image/")) {
+      res.status(400).json({ error: "Asset type does not match resource type" });
+      return;
+    }
+
+    if (resourceType === "video" &&
+      !mimeType.startsWith("video/") &&
+      !mimeType.startsWith("audio/")) {
+      res.status(400).json({ error: "Asset type does not match resource type" });
+      return;
+    }
+
+    const assetType = assetTypeFromMime(mimeType);
+    const width = Number.isFinite(body.width) ? Number(body.width) : null;
+    const height = Number.isFinite(body.height) ? Number(body.height) : null;
+    const duration = Number.isFinite(body.duration) ? Number(body.duration) : null;
+    const size = Number.isFinite(body.bytes) ? Number(body.bytes) : null;
+
+    const thumbnailUrl =
+      assetType === "image"
+        ? secureUrl
+        : assetType === "video"
+          ? cloudinary.url(publicId, {
+              secure: true,
+              resource_type: "video",
+              format: "jpg",
+              transformation: [
+                { width: 640, height: 360, crop: "limit" },
+              ],
+            })
+          : null;
+
     const asset = {
       id: crypto.randomUUID(),
       clerkUserId: userId,
       name: name.slice(0, 180),
-      type: assetTypeFromMime(mimeType),
+      type: assetType,
       mimeType,
-      url,
-      storageKey: pathname,
+      url: secureUrl,
+      storageKey: publicId,
       source: "upload",
+      thumbnailUrl,
       width,
       height,
       duration,
@@ -230,10 +219,29 @@ router.post("/assets/finalize", async (req, res) => {
 
     await db.insert(assetsTable).values(asset);
 
-    res.status(201).json({ asset });
+    req.log.info(
+      {
+        userId,
+        assetId: asset.id,
+        publicId,
+        resourceType,
+      },
+      "Cloudinary media upload finalized",
+    );
+
+    res.status(201).json({
+      asset,
+      cloudName,
+      apiKey,
+    });
   } catch (error) {
-    req.log.error({ error, userId }, "Failed to finalize uploaded asset");
-    res.status(500).json({ error: "Unable to save asset" });
+    req.log.error({ error, userId }, "Failed to finalize Cloudinary asset");
+    res.status(500).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to save Cloudinary asset",
+    });
   }
 });
 
@@ -246,7 +254,8 @@ router.get("/assets", async (req, res) => {
   }
 
   const type = typeof req.query.type === "string" ? req.query.type : "all";
-  const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+  const search =
+    typeof req.query.search === "string" ? req.query.search.trim() : "";
 
   const filters = [eq(assetsTable.clerkUserId, userId)];
   if (type !== "all") filters.push(eq(assetsTable.type, type));
@@ -279,10 +288,12 @@ router.delete("/assets/:id", async (req, res) => {
     const [asset] = await db
       .select()
       .from(assetsTable)
-      .where(and(
-        eq(assetsTable.id, req.params.id),
-        eq(assetsTable.clerkUserId, userId),
-      ))
+      .where(
+        and(
+          eq(assetsTable.id, req.params.id),
+          eq(assetsTable.clerkUserId, userId),
+        ),
+      )
       .limit(1);
 
     if (!asset) {
@@ -290,19 +301,35 @@ router.delete("/assets/:id", async (req, res) => {
       return;
     }
 
-    await del(asset.url);
+    if (asset.storageKey && asset.storageKey.startsWith(`createora/${userId}/`)) {
+      const { apiKey } = getCloudinaryConfig();
+      const resourceType =
+        asset.type === "image" ? "image" : "video";
+
+      await cloudinary.uploader.destroy(asset.storageKey, {
+        resource_type: resourceType,
+        type: "upload",
+        invalidate: true,
+        api_key: apiKey,
+      });
+    }
 
     await db
       .delete(assetsTable)
-      .where(and(
-        eq(assetsTable.id, asset.id),
-        eq(assetsTable.clerkUserId, userId),
-      ));
+      .where(
+        and(
+          eq(assetsTable.id, asset.id),
+          eq(assetsTable.clerkUserId, userId),
+        ),
+      );
 
     res.status(204).send();
   } catch (error) {
     req.log.error({ error, userId }, "Failed to delete asset");
-    res.status(500).json({ error: "Unable to delete asset" });
+    res.status(500).json({
+      error:
+        error instanceof Error ? error.message : "Unable to delete asset",
+    });
   }
 });
 
