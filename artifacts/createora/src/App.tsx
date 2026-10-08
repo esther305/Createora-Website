@@ -9,6 +9,10 @@ import {
 } from '@workspace/api-client-react';
 import {
   ArrowRight,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  UnlockKeyhole,
   ArrowUpRight,
   Check,
   CircleHelp,
@@ -898,6 +902,10 @@ function CreateoraEditor() {
   const [, setLocation] = useLocation();
   const [elements, setElements] = useState<EditorElement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [layersOpen, setLayersOpen] = useState(true);
+  const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(() => new Set());
+  const [lockedLayers, setLockedLayers] = useState<Set<string>>(() => new Set());
+  const [layerNames, setLayerNames] = useState<Record<string, string>>({});
   const [tool, setTool] = useState<'select' | 'text' | 'shape' | 'image' | 'ai'>('select');
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiAspectRatio, setAiAspectRatio] = useState('1:1');
@@ -920,6 +928,41 @@ function CreateoraEditor() {
   const playTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const selected = elements.find((element) => element.id === selectedId);
+
+  const getLayerName = (element: EditorElement, index: number) =>
+    layerNames[element.id] || (element.type === 'text' ? element.text || `Text ${index + 1}` : `${element.type[0].toUpperCase()}${element.type.slice(1)} ${index + 1}`);
+
+  const toggleLayerHidden = (id: string) => {
+    setHiddenLayers((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleLayerLocked = (id: string) => {
+    setLockedLayers((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const renameLayer = (id: string) => {
+    const current = layerNames[id] || elements.find((element) => element.id === id)?.text || 'Layer';
+    const name = window.prompt('Rename layer', current);
+    if (name?.trim()) setLayerNames((currentNames) => ({ ...currentNames, [id]: name.trim() }));
+  };
+
+  const moveLayer = (id: string, direction: 'up' | 'down') => {
+    const index = elements.findIndex((element) => element.id === id);
+    if (index < 0) return;
+    const nextIndex = direction === 'up' ? index + 1 : index - 1;
+    if (nextIndex < 0 || nextIndex >= elements.length) return;
+    const next = [...elements];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    commit(next);
+  };
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -1202,6 +1245,13 @@ function CreateoraEditor() {
     commit(next);
   };
 
+  const removeLayer = (id: string) => {
+    commit(elements.filter((element) => element.id !== id));
+    setHiddenLayers((current) => { const next = new Set(current); next.delete(id); return next; });
+    setLockedLayers((current) => { const next = new Set(current); next.delete(id); return next; });
+    if (selectedId === id) setSelectedId(null);
+  };
+
   const removeSelected = () => {
     if (!selectedId) return;
     commit(elements.filter((element) => element.id !== selectedId));
@@ -1287,8 +1337,49 @@ function CreateoraEditor() {
           <button onClick={() => setLocation('/assets')}><ImagePlus size={19} /><span>Media</span></button>
           <button className={tool === 'ai' ? 'active' : ''} onClick={() => { setTool('ai'); setSelectedId(null); }}><Sparkles size={19} /><span>AI</span></button>
           <div className="editor-tool-spacer" />
-          <button><Grid2X2 size={18} /><span>Layers</span></button>
+          <button className={layersOpen ? 'active' : ''} onClick={() => setLayersOpen((open) => !open)}><Grid2X2 size={18} /><span>Layers</span></button>
         </aside>
+
+        {layersOpen && (
+          <aside className="editor-layers-panel" aria-label="Layers panel">
+            <div className="editor-layers-head">
+              <div><span>STACK</span><strong>Layers</strong></div>
+              <span className="editor-layer-count">{elements.length}</span>
+            </div>
+            <div className="editor-layers-actions">
+              <button onClick={() => addText()}><Type size={13} /> Text</button>
+              <button onClick={() => addShape()}><Square size={13} /> Shape</button>
+              <button onClick={() => fileRef.current?.click()}><Upload size={13} /> Media</button>
+            </div>
+            <div className="editor-layers-list">
+              {[...elements].reverse().map((element, reverseIndex) => {
+                const originalIndex = elements.length - 1 - reverseIndex;
+                const hidden = hiddenLayers.has(element.id);
+                const locked = lockedLayers.has(element.id);
+                return (
+                  <div key={element.id} className={`editor-layer-row ${selectedId === element.id ? 'selected' : ''} ${hidden ? 'hidden' : ''}`}>
+                    <button className="editor-layer-main" onClick={() => { setSelectedId(element.id); setTool('select'); }} disabled={locked && hidden}>
+                      <span className={`editor-layer-thumb type-${element.type}`}>
+                        {element.type === 'text' ? <Type size={13} /> : element.type === 'shape' ? <Square size={12} /> : element.type === 'video' ? <Video size={12} /> : <ImageIcon size={12} />}
+                      </span>
+                      <span className="editor-layer-copy"><strong>{getLayerName(element, originalIndex)}</strong><small>{element.type.toUpperCase()}</small></span>
+                    </button>
+                    <div className="editor-layer-controls">
+                      <button onClick={() => toggleLayerHidden(element.id)} aria-label={hidden ? 'Show layer' : 'Hide layer'} title={hidden ? 'Show' : 'Hide'}>{hidden ? <EyeOff size={13} /> : <Eye size={13} />}</button>
+                      <button onClick={() => toggleLayerLocked(element.id)} aria-label={locked ? 'Unlock layer' : 'Lock layer'} title={locked ? 'Unlock' : 'Lock'}>{locked ? <LockKeyhole size={13} /> : <UnlockKeyhole size={13} />}</button>
+                      <button onClick={() => renameLayer(element.id)} aria-label="Rename layer" title="Rename"><PenLine size={12} /></button>
+                      <button onClick={() => moveLayer(element.id, 'up')} disabled={originalIndex === elements.length - 1} aria-label="Bring forward" title="Bring forward">↑</button>
+                      <button onClick={() => moveLayer(element.id, 'down')} disabled={originalIndex === 0} aria-label="Send backward" title="Send backward">↓</button>
+                      <button className="danger" onClick={() => removeLayer(element.id)} aria-label="Delete layer" title="Delete"><Trash2 size={12} /></button>
+                    </div>
+                  </div>
+                );
+              })}
+              {!elements.length && <div className="editor-layers-empty"><Layers3 size={18} /><span>No layers yet</span><small>Add text, shapes, images or video.</small></div>}
+            </div>
+            <div className="editor-layers-foot"><span>Top layer renders in front</span><span>Drag ordering coming next</span></div>
+          </aside>
+        )}
 
         <section className="editor-stage">
           <div className="editor-stage-head">
@@ -1308,14 +1399,15 @@ function CreateoraEditor() {
               {elements.map((element) => (
                 <div
                   key={element.id}
-                  className={`editor-element editor-element-${element.type} ${selectedId === element.id ? 'selected' : ''}`}
+                  className={`editor-element editor-element-${element.type} ${selectedId === element.id ? 'selected' : ''} ${hiddenLayers.has(element.id) ? 'editor-layer-hidden' : ''}`}
                   style={{
+                    visibility: hiddenLayers.has(element.id) ? 'hidden' : 'visible',
                     left: element.x * zoom / 100, top: element.y * zoom / 100,
                     width: element.width * zoom / 100, height: element.height * zoom / 100,
                     transform: `rotate(${element.rotation}deg)`,
                     background: element.type === 'shape' ? element.color : undefined,
                   }}
-                  onPointerDown={(event) => handlePointerDown(event, element)}
+                  onPointerDown={(event) => { if (lockedLayers.has(element.id) || hiddenLayers.has(element.id)) { event.stopPropagation(); setSelectedId(element.id); return; } handlePointerDown(event, element); }}
                 >
                   {element.type === 'text' && <span>{element.text}</span>}
                   {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} />}
