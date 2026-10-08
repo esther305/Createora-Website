@@ -913,6 +913,10 @@ function CreateoraEditor() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [zoom, setZoom] = useState(72);
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [showGuides, setShowGuides] = useState(true);
+  const [cropMode, setCropMode] = useState(false);
+  const [snapGuides, setSnapGuides] = useState<{ x?: number; y?: number }>({});
   const [history, setHistory] = useState<EditorElement[][]>([]);
   const [future, setFuture] = useState<EditorElement[][]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -928,6 +932,7 @@ function CreateoraEditor() {
   const playTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const selected = elements.find((element) => element.id === selectedId);
+  const selectedMedia = selected?.type === 'image' || selected?.type === 'video' ? selected : null;
 
   const getLayerName = (element: EditorElement, index: number) =>
     layerNames[element.id] || (element.type === 'text' ? element.text || `Text ${index + 1}` : `${element.type[0].toUpperCase()}${element.type.slice(1)} ${index + 1}`);
@@ -1294,8 +1299,23 @@ function CreateoraEditor() {
     if (!dragRef.current) return;
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const scale = zoom / 100;
-    const x = Math.max(0, Math.min(900 - (selected?.width ?? 100), (event.clientX - rect.left - dragRef.current.offsetX) / scale));
-    const y = Math.max(0, Math.min(600 - (selected?.height ?? 80), (event.clientY - rect.top - dragRef.current.offsetY) / scale));
+    const moving = elements.find((item) => item.id === dragRef.current?.id);
+    if (!moving) return;
+    let x = Math.max(0, Math.min(900 - moving.width, (event.clientX - rect.left - dragRef.current.offsetX) / scale));
+    let y = Math.max(0, Math.min(600 - moving.height, (event.clientY - rect.top - dragRef.current.offsetY) / scale));
+    const guides: { x?: number; y?: number } = {};
+    if (snapEnabled) {
+      const threshold = 10;
+      const centerX = (900 - moving.width) / 2;
+      const centerY = (600 - moving.height) / 2;
+      if (Math.abs(x - centerX) <= threshold) { x = centerX; guides.x = 450; }
+      else if (Math.abs(x) <= threshold) { x = 0; guides.x = 0; }
+      else if (Math.abs(x + moving.width - 900) <= threshold) { x = 900 - moving.width; guides.x = 900; }
+      if (Math.abs(y - centerY) <= threshold) { y = centerY; guides.y = 300; }
+      else if (Math.abs(y) <= threshold) { y = 0; guides.y = 0; }
+      else if (Math.abs(y + moving.height - 600) <= threshold) { y = 600 - moving.height; guides.y = 600; }
+    }
+    setSnapGuides(showGuides ? guides : {});
     setElements((current) => current.map((item) => item.id === dragRef.current?.id ? { ...item, x, y } : item));
   };
 
@@ -1305,6 +1325,7 @@ function CreateoraEditor() {
     setHistory((h) => [...h.slice(-19), current]);
     setFuture([]);
     dragRef.current = null;
+    setSnapGuides({});
   };
 
   return (
@@ -1335,6 +1356,7 @@ function CreateoraEditor() {
           <button className={tool === 'shape' ? 'active' : ''} onClick={() => addShape()}><Square size={19} /><span>Shape</span></button>
           <button onClick={() => fileRef.current?.click()}><Upload size={19} /><span>Upload</span></button>
           <button onClick={() => setLocation('/assets')}><ImagePlus size={19} /><span>Media</span></button>
+          <button className={snapEnabled ? 'active' : ''} onClick={() => setSnapEnabled((enabled) => !enabled)} title="Toggle snapping"><Target size={18} /><span>Snap</span></button>
           <button className={tool === 'ai' ? 'active' : ''} onClick={() => { setTool('ai'); setSelectedId(null); }}><Sparkles size={19} /><span>AI</span></button>
           <div className="editor-tool-spacer" />
           <button className={layersOpen ? 'active' : ''} onClick={() => setLayersOpen((open) => !open)}><Grid2X2 size={18} /><span>Layers</span></button>
@@ -1396,6 +1418,10 @@ function CreateoraEditor() {
               onPointerLeave={finishDrag}
             >
               <div className="editor-canvas-grid" />
+              <div className="editor-ruler editor-ruler-horizontal" aria-hidden="true"><span>0</span><span>225</span><span>450</span><span>675</span><span>900</span></div>
+              <div className="editor-ruler editor-ruler-vertical" aria-hidden="true"><span>0</span><span>150</span><span>300</span><span>450</span><span>600</span></div>
+              {showGuides && snapGuides.x !== undefined && <div className="editor-snap-guide editor-snap-guide-x" style={{ left: snapGuides.x * zoom / 100 }}><span>{snapGuides.x}</span></div>}
+              {showGuides && snapGuides.y !== undefined && <div className="editor-snap-guide editor-snap-guide-y" style={{ top: snapGuides.y * zoom / 100 }}><span>{snapGuides.y}</span></div>}
               {elements.map((element) => (
                 <div
                   key={element.id}
@@ -1411,7 +1437,8 @@ function CreateoraEditor() {
                 >
                   {element.type === 'text' && <span>{element.text}</span>}
                   {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} />}
-                  {selectedId === element.id && <span className="editor-selection-label">{element.type.toUpperCase()}</span>}
+                  {element.type === 'video' && element.src && <video src={element.src} muted playsInline preload="metadata" draggable={false} />}
+                  {selectedId === element.id && <span className="editor-selection-label">{cropMode ? 'CROP' : element.type.toUpperCase()}</span>}
                 </div>
               ))}
               {!elements.length && (
@@ -1550,6 +1577,18 @@ function CreateoraEditor() {
                       <label>H<input id="element-height" name="element-height" type="number" value={Math.round(selected.height)} onChange={(e) => updateSelected({ height: Number(e.target.value) })} /></label>
                     </div>
                   </div>
+                  {selectedMedia && (
+                    <div className="inspector-section editor-transform-tools">
+                      <div className="inspector-section-title"><span>Transform</span><small>{selectedMedia.type.toUpperCase()}</small></div>
+                      <div className="transform-tool-grid">
+                        <button className={cropMode ? 'active' : ''} onClick={() => setCropMode((mode) => !mode)}><Square size={13} /> {cropMode ? 'Exit crop' : 'Crop'}</button>
+                        <button className={snapEnabled ? 'active' : ''} onClick={() => setSnapEnabled((enabled) => !enabled)}><Target size={13} /> Snap</button>
+                        <button className={showGuides ? 'active' : ''} onClick={() => setShowGuides((visible) => !visible)}><Grid2X2 size={13} /> Guides</button>
+                      </div>
+                      {cropMode && <div className="crop-helper"><strong>Crop mode active</strong><span>Use the canvas handles to frame the media.</span></div>}
+                    </div>
+                  )}
+
                   {selected.type === 'video' && (
                     <>
                       <div className="inspector-section video-clip-controls">
