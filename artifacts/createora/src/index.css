@@ -1051,3 +1051,27 @@
   .editor-rotate-handle{width:24px;height:24px;top:-40px}
   .editor-rotate-stem{top:-31px;height:21px}
 }
+
+/* --------------------------------------------------
+   Layers panel
+-------------------------------------------------- */
+.editor-layers-panel{width:236px;flex:0 0 236px;border-right:1px solid #262c28;background:#151816;color:#c8cec9;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.editor-layers-head{height:58px;flex:0 0 58px;padding:12px 13px;border-bottom:1px solid #252b27;display:flex;align-items:center;justify-content:space-between}
+.editor-layers-head div{display:grid;gap:3px}.editor-layers-head span:first-child{font:700 7px var(--app-font-mono);letter-spacing:.15em;color:#657068}.editor-layers-head strong{font-size:13px;color:#eef2ee}.editor-layer-count{display:grid;place-items:center;min-width:24px;height:24px;border-radius:7px;background:#202722;color:#7bd39b;font:700 8px var(--app-font-mono)}
+.editor-layers-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:9px;border-bottom:1px solid #252b27}
+.editor-layers-actions button{height:30px;border:1px solid #303631;border-radius:6px;background:#1b201d;color:#8d9890;font-size:7px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer}
+.editor-layers-actions button:hover{border-color:#3e8d5f;color:#bfe9cd;background:#202822}
+.editor-layers-list{min-height:0;flex:1;overflow:auto;padding:7px}
+.editor-layer-row{display:flex;align-items:stretch;gap:4px;margin-bottom:4px;border:1px solid transparent;border-radius:8px;background:#191e1b;overflow:hidden;transition:border-color .15s,background .15s}
+.editor-layer-row:hover{border-color:#303a33;background:#1d241f}.editor-layer-row.selected{border-color:#3e8f61;background:#203027}.editor-layer-row.hidden{opacity:.58}
+.editor-layer-main{min-width:0;flex:1;border:0;background:transparent;color:inherit;padding:7px 6px;display:flex;align-items:center;gap:8px;text-align:left;cursor:pointer}
+.editor-layer-main:disabled{cursor:default}.editor-layer-thumb{width:28px;height:28px;flex:0 0 28px;border-radius:6px;display:grid;place-items:center;color:#a9b2ac;background:#252d28}
+.editor-layer-thumb.type-text{background:#25352c;color:#73d397}.editor-layer-thumb.type-shape{background:#2c3430;color:#d3a76e}.editor-layer-thumb.type-image{background:#26323a;color:#78b8dc}.editor-layer-thumb.type-video{background:#302b42;color:#a895df}
+.editor-layer-copy{min-width:0;display:grid;gap:3px}.editor-layer-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#dce2dd;font-size:8px;font-weight:700}.editor-layer-copy small{font:6px var(--app-font-mono);letter-spacing:.08em;color:#657068}
+.editor-layer-controls{display:grid;grid-template-columns:repeat(3,24px);grid-template-rows:repeat(2,24px);align-content:center;gap:2px;padding:4px}
+.editor-layer-controls button{border:0;background:transparent;color:#66716a;border-radius:5px;display:grid;place-items:center;cursor:pointer;font-size:10px}.editor-layer-controls button:hover:not(:disabled){background:#28312b;color:#c6d1ca}.editor-layer-controls button:disabled{opacity:.22;cursor:not-allowed}.editor-layer-controls button.danger:hover{background:#3a2524;color:#ee928b}
+.editor-layers-empty{display:grid;justify-items:center;gap:7px;padding:45px 12px;text-align:center;color:#66716a}.editor-layers-empty svg{color:#3e8f61}.editor-layers-empty span{font-size:10px;color:#a4aea7}.editor-layers-empty small{font-size:7px;line-height:1.5}
+.editor-layers-foot{flex:0 0 auto;border-top:1px solid #252b27;padding:9px 11px;display:grid;gap:4px;color:#5f6962;font:6px var(--app-font-mono);text-transform:uppercase;letter-spacing:.05em}
+.editor-layers-foot span:last-child{color:#465048}
+@media(max-width:1000px){.editor-layers-panel{width:210px;flex-basis:210px}.editor-layer-controls{grid-template-columns:repeat(2,24px);grid-template-rows:repeat(3,24px)}}
+@media(max-width:760px){.editor-layers-panel{position:absolute;left:54px;top:0;bottom:0;z-index:30;width:270px;box-shadow:18px 0 45px rgba(0,0,0,.28)}}
