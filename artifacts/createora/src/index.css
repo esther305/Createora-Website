@@ -1075,3 +1075,181 @@
 .editor-layers-foot span:last-child{color:#465048}
 @media(max-width:1000px){.editor-layers-panel{width:210px;flex-basis:210px}.editor-layer-controls{grid-template-columns:repeat(2,24px);grid-template-rows:repeat(3,24px)}}
 @media(max-width:760px){.editor-layers-panel{position:absolute;left:54px;top:0;bottom:0;z-index:30;width:270px;box-shadow:18px 0 45px rgba(0,0,0,.28)}}
+
+/* ==================================================
+   Global responsive pass — Createora
+================================================== */
+html,body,#root{width:100%;min-width:0}
+img,video,canvas,svg{max-width:100%}
+button,input,textarea,select{max-width:100%}
+.container-wide{width:min(1200px,calc(100% - 48px))}
+@media(max-width:1024px){
+  .container-wide{width:min(100% - 40px,900px)}
+  .nav-links{gap:20px}
+  .nav-actions{gap:9px}
+  .hero{padding:68px 0 82px;min-height:auto}
+  .hero-grid{grid-template-columns:1fr;gap:44px}
+  .hero-copy{max-width:760px}
+  .workspace-preview{max-width:820px;margin:auto;width:100%;padding-left:0}
+  .preview-window{transform:none}
+  .tools-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  .container-wide{width:calc(100% - 32px)}
+  .nav-shell{padding-top:10px}
+  .nav{min-height:56px}
+  .nav-links,.nav-actions .nav-login,.nav-actions .nav-cta{display:none}
+  .nav-actions{gap:10px}
+  .mobile-toggle{display:grid;place-items:center;width:40px;height:40px;border:1px solid hsl(var(--border));border-radius:10px;background:hsl(var(--card))}
+  .nav.is-open,.nav:has(.mobile-toggle:focus-visible){flex-wrap:wrap}
+  .display-xl{font-size:clamp(3rem,15vw,5rem)}
+  .display-lg{font-size:clamp(2.7rem,13vw,4.6rem)}
+  .display-md{font-size:clamp(2.4rem,12vw,4rem)}
+  .hero{padding:54px 0 62px}
+  .hero-buttons{align-items:stretch}
+  .hero-buttons .btn{width:100%}
+  .workspace-preview{min-height:0;overflow:hidden}
+  .preview-window{width:100%;border-radius:12px}
+  .preview-layout{grid-template-columns:72px 1fr;min-height:310px}
+  .preview-sidebar{padding:12px 7px;font-size:8px}
+  .preview-avatar{margin-left:4px}
+  .preview-nav{padding:7px 5px;gap:5px}
+  .preview-nav span{display:none}
+  .preview-main{padding:18px 14px}
+  .preview-heading h3{font-size:19px;margin-bottom:15px}
+  .quick-tools{flex-wrap:wrap}
+  .quick-tool{flex:1 1 44%}
+  .section-topline{padding-bottom:13px}
+  .tools-grid,.workflow-grid,.proof-grid,.pricing-grid,.faq-grid{grid-template-columns:1fr}
+  .pricing-card{width:100%}
+  .footer-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:520px){
+  .container-wide{width:calc(100% - 24px)}
+  .announcement{max-width:100%;font-size:8px}
+  .lede{font-size:1rem}
+  .hero-copy h1{margin:14px 0 20px}
+  .hero-buttons{margin-top:24px}
+  .hero-note{align-items:flex-start;line-height:1.5}
+  .workspace-preview{padding:10px 0}
+  .preview-topbar{padding:0 10px;height:36px}
+  .preview-url{display:none}
+  .preview-layout{grid-template-columns:1fr;min-height:0}
+  .preview-sidebar{display:none}
+  .preview-main{padding:16px 12px}
+  .preview-heading h3{font-size:17px}
+  .prompt-input{font-size:9px}
+  .footer-grid{grid-template-columns:1fr}
+  .btn-lg{min-height:50px}
+  .section-topline{align-items:flex-start;gap:10px}
+}
+
+/* Dashboard */
+@media(max-width:1050px){
+  .studio-shell{grid-template-columns:220px minmax(0,1fr)}
+  .studio-main{min-width:0}
+  .studio-sidebar{width:220px}
+}
+@media(max-width:760px){
+  .studio-shell{display:block;min-height:100vh}
+  .studio-sidebar{display:none}
+  .studio-main{width:100%}
+  .studio-topbar{height:62px;padding:0 16px}
+  .studio-mobile-brand{display:block}
+  .studio-search{display:none}
+  .studio-topbar .studio-notifications{margin-left:auto}
+  .studio-content,.studio-main-inner{padding-left:16px;padding-right:16px}
+  .studio-hero,.studio-section{margin-left:0;margin-right:0}
+  .studio-quick-grid,.studio-template-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:520px){
+  .studio-topbar{padding:0 12px}
+  .studio-quick-grid,.studio-template-row{grid-template-columns:1fr}
+  .studio-welcome h1{font-size:clamp(30px,9vw,44px)}
+  .studio-hero{padding:22px 16px}
+}
+
+/* Projects */
+@media(max-width:760px){
+  .projects-header{min-height:58px}
+  .projects-main{padding:30px 16px 60px}
+  .projects-hero{gap:24px}
+  .projects-create-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:520px){
+  .projects-create-grid{grid-template-columns:1fr}
+  .projects-hero h1{font-size:clamp(36px,12vw,50px)}
+  .projects-header-left .wordmark{font-size:19px}
+  .projects-toolbar label{width:100%}
+  .workspace-project-art{height:190px}
+}
+
+/* Editor */
+.editor-body{min-width:0;min-height:0}
+.editor-stage{min-width:0;overflow:hidden}
+.editor-canvas-wrap{min-width:0;overflow:auto;overscroll-behavior:contain}
+.editor-inspector{min-width:0;overflow:auto}
+@media(max-width:1100px){
+  .editor-inspector{width:250px;flex-basis:250px}
+  .editor-layers-panel{width:205px;flex-basis:205px}
+}
+@media(max-width:900px){
+  .editor-body{position:relative}
+  .editor-inspector{width:230px;flex-basis:230px}
+  .editor-layers-panel{width:220px;flex-basis:220px}
+}
+@media(max-width:760px){
+  .createora-editor{min-height:100dvh;height:auto}
+  .editor-topbar{min-height:56px;height:auto;padding:8px 10px;gap:8px;flex-wrap:wrap}
+  .editor-brand{min-width:0;flex:1}
+  .editor-project-name{max-width:120px}
+  .editor-project-name strong,.editor-project-name small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .editor-top-center{order:3;width:100%;justify-content:center}
+  .editor-top-right{margin-left:auto}
+  .editor-top-right .editor-icon-action{display:none}
+  .editor-export{padding:0 9px}
+  .editor-body{min-height:calc(100dvh - 96px)}
+  .editor-toolbar{width:52px;flex-basis:52px}
+  .editor-toolbar button span{display:none}
+  .editor-stage{flex:1;width:calc(100% - 52px)}
+  .editor-stage-head{padding:8px 10px}
+  .editor-canvas-wrap{padding:18px 10px 12px;display:block}
+  .editor-canvas{margin:0 auto}
+  .editor-inspector{position:absolute;right:0;top:0;bottom:0;width:min(88vw,310px);z-index:25;box-shadow:-18px 0 45px rgba(0,0,0,.28)}
+  .editor-layers-panel{position:absolute;left:52px;top:0;bottom:0;width:min(78vw,280px);z-index:30}
+  .editor-bottom-bar{padding:0 10px}
+}
+@media(max-width:520px){
+  .editor-brand .wordmark{font-size:18px}
+  .editor-back{width:28px;height:28px}
+  .editor-divider{display:none}
+  .editor-project-name{max-width:90px}
+  .editor-top-right .editor-avatar{display:none}
+  .editor-export{font-size:8px}
+  .editor-stage-head strong{font-size:8px}
+  .editor-canvas-wrap{padding:14px 6px 8px}
+  .editor-inspector{width:calc(100vw - 52px);max-width:none}
+  .editor-timeline{height:190px;flex-basis:190px}
+  .timeline-time{font-size:8px}
+  .timeline-ruler,.timeline-tracks{left:62px}
+  .timeline-track-labels{width:62px}
+  .timeline-track-label{padding-left:8px;font-size:7px}
+  .timeline-actions{display:none}
+}
+
+/* Auth */
+.auth-shell{min-height:100dvh;width:100%;overflow:hidden}
+.auth-card,.auth-panel{min-width:0;max-width:100%}
+.auth-card input,.auth-card button,.auth-panel input,.auth-panel button{max-width:100%}
+@media(max-width:820px){
+  .auth-shell{grid-template-columns:1fr!important}
+  .auth-visual{display:none!important}
+  .auth-form-wrap{min-height:100dvh;padding:28px 20px}
+}
+@media(max-width:480px){
+  .auth-form-wrap{padding:20px 14px}
+  .auth-card{width:100%;padding:22px 18px!important;border-radius:16px}
+  .auth-card h1{font-size:28px}
+  .auth-card .auth-actions{flex-direction:column}
+  .auth-card .auth-actions button{width:100%}
+}
