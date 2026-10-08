@@ -1109,8 +1109,8 @@ function CreateoraEditor() {
     if (!file) return;
 
     try {
-      if (!file.type.startsWith('image/')) {
-        throw new Error('The editor currently accepts image files only.');
+      if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+        throw new Error('The editor accepts image and video files.');
       }
 
       const token = await getToken();
@@ -1129,18 +1129,30 @@ function CreateoraEditor() {
           image.onerror = () => reject(new Error('Unable to read uploaded image'));
         });
 
-        const asset = await uploadAssetDirect(file, token, {
-          width: image.naturalWidth || null,
-          height: image.naturalHeight || null,
-        });
+        const metadata = file.type.startsWith('image/')
+          ? {
+              width: image.naturalWidth || null,
+              height: image.naturalHeight || null,
+            }
+          : await getBrowserMediaMetadata(file);
+
+        const asset = await uploadAssetToCloudinary(file, token, metadata);
+
+        const isVideo = file.type.startsWith('video/');
+        const sourceWidth = asset.width || metadata.width || 720;
+        const sourceHeight = asset.height || metadata.height || (isVideo ? 405 : 720);
+        const maxWidth = 520;
+        const scale = Math.min(1, maxWidth / sourceWidth);
+        const width = Math.round(sourceWidth * scale);
+        const height = Math.round(sourceHeight * scale);
 
         addElement({
           id: crypto.randomUUID(),
-          type: 'image',
-          x: 180,
-          y: 140,
-          width: 420,
-          height: 300,
+          type: isVideo ? 'video' : 'image',
+          x: Math.round((900 - width) / 2),
+          y: Math.round((600 - height) / 2),
+          width,
+          height,
           rotation: 0,
           src: asset.url,
         });
@@ -1439,6 +1451,28 @@ function CreateoraEditor() {
   );
 }
 
+const getBrowserMediaMetadata = async (file: File) => {
+  const url = URL.createObjectURL(file);
+  try {
+    const media = document.createElement(file.type.startsWith('video/') ? 'video' : 'audio');
+    media.preload = 'metadata';
+    media.src = url;
+
+    await new Promise<void>((resolve, reject) => {
+      media.onloadedmetadata = () => resolve();
+      media.onerror = () => reject(new Error('Unable to read media metadata'));
+    });
+
+    return {
+      width: file.type.startsWith('video/') ? media.videoWidth || null : null,
+      height: file.type.startsWith('video/') ? media.videoHeight || null : null,
+      duration: Number.isFinite(media.duration) ? media.duration : null,
+    };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+};
+
 type MediaAsset = { id: string; clerkUserId: string; name: string; type: string; mimeType: string | null; url: string; thumbnailUrl: string | null; storageKey: string | null; source: string; width: number | null; height: number | null; duration: number | null; size: number | null; createdAt: string; };
 const formatAssetBytes = (bytes: number | null) => { if (!bytes) return '—'; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`; if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`; return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`; };
 const formatAssetDuration = (seconds: number | null) => { if (!seconds) return ''; const minutes = Math.floor(seconds / 60); const remainder = Math.floor(seconds % 60).toString().padStart(2, '0'); return `${minutes}:${remainder}`; };
@@ -1477,7 +1511,17 @@ function MediaLibraryPage() {
         const file = files[index];
         const metadata = await getMediaMetadata(file);
 
-        await uploadAssetDirect(file, token, metadata);
+        await uploadAssetToCloudinary(
+          file,
+          token,
+          metadata,
+          (fileProgress) => {
+            const completedFiles = index;
+            const overallProgress =
+              ((completedFiles + fileProgress / 100) / files.length) * 100;
+            setProgress(Math.round(overallProgress));
+          },
+        );
 
         setProgress(Math.round(((index + 1) / files.length) * 100));
       }
@@ -1521,61 +1565,124 @@ function AppRoutes() {
   );
 }
 
-type DirectUploadMetadata = {
+type CloudinaryUploadMetadata = {
   width?: number | null;
   height?: number | null;
   duration?: number | null;
 };
 
-async function uploadAssetDirect(
+type CloudinaryUploadProgress = (percent: number) => void;
+
+async function uploadAssetToCloudinary(
   file: File,
   token: string,
-  metadata: DirectUploadMetadata = {},
+  metadata: CloudinaryUploadMetadata = {},
+  onProgress?: CloudinaryUploadProgress,
 ) {
-  const response = await fetch('/api/assets/upload-direct', {
+  const signatureResponse = await fetch('/api/assets/cloudinary/signature', {
     method: 'POST',
     headers: {
       Accept: 'application/json',
+      'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
-      'Content-Type': file.type,
-      'X-Asset-Name': encodeURIComponent(file.name),
-      'X-Asset-Size': String(file.size),
-      'X-Asset-Width': metadata.width == null ? '' : String(metadata.width),
-      'X-Asset-Height': metadata.height == null ? '' : String(metadata.height),
-      'X-Asset-Duration':
-        metadata.duration == null ? '' : String(metadata.duration),
     },
-    body: file,
+    body: JSON.stringify({
+      contentType: file.type,
+    }),
   });
 
-  const raw = await response.text();
+  const signatureData = await signatureResponse.json();
 
-  let data: {
-    asset?: MediaAsset;
-    error?: string;
-  } = {};
-
-  if (raw.trim()) {
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      throw new Error(
-        `Upload server returned an invalid response (HTTP ${response.status}).`,
-      );
-    }
-  }
-
-  if (!response.ok) {
+  if (!signatureResponse.ok) {
     throw new Error(
-      data.error || `Upload failed (HTTP ${response.status}).`,
+      signatureData.error || 'Unable to prepare Cloudinary upload.',
     );
   }
 
-  if (!data.asset) {
-    throw new Error('Upload completed but no asset was returned.');
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('api_key', signatureData.apiKey);
+  formData.append('timestamp', String(signatureData.timestamp));
+  formData.append('signature', signatureData.signature);
+  formData.append('public_id', signatureData.publicId);
+
+  const cloudinaryResponse = await new Promise<any>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.open(
+      'POST',
+      `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/${signatureData.resourceType}/upload`,
+    );
+    xhr.responseType = 'json';
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        onProgress?.(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Cloudinary upload failed.'));
+    xhr.onabort = () => reject(new Error('Cloudinary upload was cancelled.'));
+    xhr.onload = () => {
+      const data = xhr.response;
+
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(
+          new Error(
+            data?.error?.message ||
+              `Cloudinary upload failed (HTTP ${xhr.status}).`,
+          ),
+        );
+        return;
+      }
+
+      if (!data) {
+        reject(new Error('Cloudinary returned an empty upload response.'));
+        return;
+      }
+
+      resolve(data);
+    };
+
+    xhr.send(formData);
+  });
+
+  const finalizeResponse = await fetch('/api/assets/cloudinary/finalize', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      publicId: cloudinaryResponse.public_id,
+      signature: cloudinaryResponse.signature,
+      version: cloudinaryResponse.version,
+      secureUrl: cloudinaryResponse.secure_url,
+      resourceType: cloudinaryResponse.resource_type,
+      name: file.name,
+      mimeType: file.type,
+      width: cloudinaryResponse.width ?? metadata.width ?? null,
+      height: cloudinaryResponse.height ?? metadata.height ?? null,
+      duration: cloudinaryResponse.duration ?? metadata.duration ?? null,
+      bytes: cloudinaryResponse.bytes ?? file.size,
+    }),
+  });
+
+  const finalizeData = await finalizeResponse.json();
+
+  if (!finalizeResponse.ok) {
+    throw new Error(
+      finalizeData.error || 'Cloudinary upload completed but could not be saved.',
+    );
   }
 
-  return data.asset;
+  if (!finalizeData.asset) {
+    throw new Error('Cloudinary upload completed but no asset was returned.');
+  }
+
+  onProgress?.(100);
+  return finalizeData.asset as MediaAsset;
 }
 
 function RoutedErrorBoundary({ children }: { children: ReactNode }) {
