@@ -1253,3 +1253,25 @@ button,input,textarea,select{max-width:100%}
   .auth-card .auth-actions{flex-direction:column}
   .auth-card .auth-actions button{width:100%}
 }
+
+
+/* Crop / snapping workspace */
+.editor-canvas{position:relative}
+.editor-ruler{position:absolute;z-index:5;pointer-events:none;font:6px var(--app-font-mono);color:#69736c;opacity:.72}
+.editor-ruler-horizontal{left:0;right:0;top:-17px;height:15px;border-bottom:1px solid #303732;background:repeating-linear-gradient(90deg,transparent 0,transparent 49px,#303732 50px)}
+.editor-ruler-horizontal span{position:absolute;top:3px;transform:translateX(-50%)}
+.editor-ruler-horizontal span:nth-child(1){left:0}.editor-ruler-horizontal span:nth-child(2){left:25%}.editor-ruler-horizontal span:nth-child(3){left:50%}.editor-ruler-horizontal span:nth-child(4){left:75%}.editor-ruler-horizontal span:nth-child(5){left:100%}
+.editor-ruler-vertical{top:0;bottom:0;left:-24px;width:20px;border-right:1px solid #303732;background:repeating-linear-gradient(0deg,transparent 0,transparent 49px,#303732 50px)}
+.editor-ruler-vertical span{position:absolute;left:3px;transform:translateY(-50%);writing-mode:vertical-rl}
+.editor-ruler-vertical span:nth-child(1){top:0}.editor-ruler-vertical span:nth-child(2){top:25%}.editor-ruler-vertical span:nth-child(3){top:50%}.editor-ruler-vertical span:nth-child(4){top:75%}.editor-ruler-vertical span:nth-child(5){top:100%}
+.editor-snap-guide{position:absolute;z-index:15;pointer-events:none;background:#e6a05b;box-shadow:0 0 8px rgba(230,160,91,.35)}
+.editor-snap-guide-x{top:0;bottom:0;width:1px}.editor-snap-guide-y{left:0;right:0;height:1px}
+.editor-snap-guide span{position:absolute;padding:2px 4px;border-radius:3px;background:#e6a05b;color:#20170f;font:700 6px var(--app-font-mono)}
+.editor-snap-guide-x span{top:5px;left:4px}.editor-snap-guide-y span{top:4px;left:5px}
+.editor-transform-tools{border-top:1px solid #e0e6e1;padding-top:12px}
+.transform-tool-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.transform-tool-grid button{min-height:34px;border:1px solid #d7dfd8;border-radius:7px;background:#f8faf8;color:#59665e;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer}
+.transform-tool-grid button:hover,.transform-tool-grid button.active{border-color:#69b886;background:#eef8f1;color:#2d7f50}
+.crop-helper{display:grid;gap:4px;margin-top:8px;padding:8px;border-radius:7px;background:#f2f6f3;color:#68736c;font-size:8px;line-height:1.45}
+.crop-helper strong{color:#376448;font-size:8px}
+@media(max-width:760px){.editor-ruler-vertical{display:none}.editor-ruler-horizontal{top:-13px}}
