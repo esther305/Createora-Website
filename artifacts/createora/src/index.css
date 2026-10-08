@@ -1024,3 +1024,30 @@
   .timeline-track-labels{width:70px}
   .timeline-clip{height:36px}
 }
+
+/* --------------------------------------------------
+   Professional canvas selection controls
+-------------------------------------------------- */
+.editor-element{position:absolute;box-sizing:border-box;touch-action:none;transform-origin:center center;user-select:none}
+.editor-element.selected{outline:1px solid rgba(88,214,137,.95);outline-offset:0;box-shadow:0 0 0 1px rgba(13,38,24,.5),0 0 0 4px rgba(70,190,116,.08)}
+.editor-selection-label{position:absolute!important;left:0;top:-22px!important;height:18px;padding:3px 6px;border-radius:4px;background:#2f9e64!important;color:#fff!important;font:700 7px var(--app-font-mono)!important;letter-spacing:.08em;line-height:12px;white-space:nowrap;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+.editor-resize-handle,.editor-rotate-handle{position:absolute!important;z-index:20;display:grid;place-items:center;padding:0;margin:0;border:1px solid #2f9e64!important;background:#fff!important;color:#246b43!important;box-shadow:0 2px 7px rgba(0,0,0,.22);pointer-events:auto}
+.editor-resize-handle{width:10px;height:10px;border-radius:3px;transform:translate(-50%,-50%);cursor:nwse-resize}
+.editor-resize-n{left:50%;top:0;cursor:ns-resize}
+.editor-resize-e{left:100%;top:50%;cursor:ew-resize}
+.editor-resize-s{left:50%;top:100%;cursor:ns-resize}
+.editor-resize-w{left:0;top:50%;cursor:ew-resize}
+.editor-resize-ne{left:100%;top:0;cursor:nesw-resize}
+.editor-resize-sw{left:0;top:100%;cursor:nesw-resize}
+.editor-resize-se{left:100%;top:100%;cursor:nwse-resize}
+.editor-resize-nw{left:0;top:0;cursor:nwse-resize}
+.editor-rotate-stem{position:absolute!important;z-index:18;left:50%;top:-29px;width:1px;height:19px;background:#2f9e64;transform:translateX(-50%);pointer-events:none}
+.editor-rotate-handle{left:50%;top:-36px;width:22px;height:22px;border-radius:50%;transform:translateX(-50%);cursor:grab}
+.editor-rotate-handle:active{cursor:grabbing}
+.editor-rotate-handle svg{pointer-events:none}
+.editor-element.selected img,.editor-element.selected video{pointer-events:none}
+@media(max-width:650px){
+  .editor-resize-handle{width:12px;height:12px}
+  .editor-rotate-handle{width:24px;height:24px;top:-40px}
+  .editor-rotate-stem{top:-31px;height:21px}
+}
