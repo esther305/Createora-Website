@@ -611,9 +611,21 @@ function ProjectsPage() {
 
   const loadProjects = async () => {
     const token = await getToken();
-    const response = await fetch('/api/projects', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+
+    const response = await fetch('/api/projects', {
+      headers: token
+        ? {
+            Authorization: `Bearer ${token}`,
+          }
+        : {},
+    });
+
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Unable to load projects');
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Unable to load projects');
+    }
+
     setProjects(data.projects ?? []);
   };
 
@@ -794,6 +806,8 @@ function DashboardPage() {
                   </button>
                 )}
               </div>
+            </section>
+
             <aside className="studio-side-stack">
               <section className="studio-panel" id="ai-studio">
                 <div className="studio-panel-top"><span className="studio-panel-icon"><Sparkles size={17} /></span><span>AI Studio</span><span className="studio-live-pill">LIVE</span></div>
@@ -860,7 +874,7 @@ function ClerkQueryClientCacheInvalidator() {
 
 type EditorElement = {
   id: string;
-  type: 'text' | 'shape' | 'image' | 'video';
+  type: 'text' | 'shape' | 'image';
   x: number;
   y: number;
   width: number;
@@ -877,11 +891,6 @@ type EditorElement = {
   text?: string;
   color?: string;
   src?: string;
-  opacity?: number;
-  brightness?: number;
-  contrast?: number;
-  saturation?: number;
-  grayscale?: number;
 };
 
 function CreateoraEditor() {
@@ -889,10 +898,7 @@ function CreateoraEditor() {
   const [, setLocation] = useLocation();
   const [elements, setElements] = useState<EditorElement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tool, setTool] = useState<'select' | 'text' | 'shape' | 'image' | 'media' | 'ai'>('select');
-  const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([]);
-  const [mediaLoading, setMediaLoading] = useState(false);
-  const [mediaError, setMediaError] = useState('');
+  const [tool, setTool] = useState<'select' | 'text' | 'shape' | 'image' | 'ai'>('select');
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiAspectRatio, setAiAspectRatio] = useState('1:1');
   const [aiImage, setAiImage] = useState<string | null>(null);
@@ -903,22 +909,6 @@ function CreateoraEditor() {
   const [future, setFuture] = useState<EditorElement[][]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
-  const transformRef = useRef<{
-    mode: 'resize' | 'rotate';
-    id: string;
-    handle?: string;
-    startX: number;
-    startY: number;
-    startWidth: number;
-    startHeight: number;
-    startLeft: number;
-    startTop: number;
-    startRotation: number;
-    centerX: number;
-    centerY: number;
-    startAngle: number;
-  } | null>(null);
-  const interactionStartRef = useRef<EditorElement[] | null>(null);
   const [projectName, setProjectName] = useState('Untitled design');
   const [projectId, setProjectId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('project'));
   const [projectReady, setProjectReady] = useState(false);
@@ -930,30 +920,6 @@ function CreateoraEditor() {
   const playTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const selected = elements.find((element) => element.id === selectedId);
-
-  const loadEditorMedia = async () => {
-    try {
-      setMediaLoading(true);
-      setMediaError('');
-      const token = await getToken();
-      if (!token) throw new Error('Your session expired. Please sign in again.');
-      const response = await fetch('/api/assets', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Unable to load media');
-      setMediaAssets(data.assets ?? []);
-    } catch (error) {
-      setMediaError(error instanceof Error ? error.message : 'Unable to load media');
-    } finally {
-      setMediaLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isSignedIn && tool === 'media') void loadEditorMedia();
-  }, [isSignedIn, tool]);
-
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -1141,35 +1107,13 @@ function CreateoraEditor() {
     rotation: 0, color: '#2f9e64'
   });
 
-  const addMediaAsset = (asset: MediaAsset) => {
-    const isVideo = asset.type === 'video' || asset.mimeType?.startsWith('video/');
-    const sourceWidth = asset.width || 720;
-    const sourceHeight = asset.height || (isVideo ? 405 : 720);
-    const maxWidth = 520;
-    const scale = Math.min(1, maxWidth / sourceWidth);
-    const width = Math.round(sourceWidth * scale);
-    const height = Math.round(sourceHeight * scale);
-
-    addElement({
-      id: crypto.randomUUID(),
-      type: isVideo ? 'video' : 'image',
-      x: Math.round((900 - width) / 2),
-      y: Math.round((600 - height) / 2),
-      width,
-      height,
-      rotation: 0,
-      src: asset.url,
-    });
-  };
-
-
   const onUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     try {
-      if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-        throw new Error('The editor accepts image and video files.');
+      if (!file.type.startsWith('image/')) {
+        throw new Error('The editor currently accepts image files only.');
       }
 
       const token = await getToken();
@@ -1177,50 +1121,35 @@ function CreateoraEditor() {
         throw new Error('Your session expired. Please sign in again.');
       }
 
-      let metadata: CloudinaryUploadMetadata;
+      const image = new Image();
+      const objectUrl = URL.createObjectURL(file);
 
-      if (file.type.startsWith('image/')) {
-        const objectUrl = URL.createObjectURL(file);
-        try {
-          const image = new Image();
-          image.src = objectUrl;
+      try {
+        image.src = objectUrl;
 
-          await new Promise<void>((resolve, reject) => {
-            image.onload = () => resolve();
-            image.onerror = () => reject(new Error('Unable to read uploaded image'));
-          });
+        await new Promise<void>((resolve, reject) => {
+          image.onload = () => resolve();
+          image.onerror = () => reject(new Error('Unable to read uploaded image'));
+        });
 
-          metadata = {
-            width: image.naturalWidth || null,
-            height: image.naturalHeight || null,
-          };
-        } finally {
-          URL.revokeObjectURL(objectUrl);
-        }
-      } else {
-        metadata = await getBrowserMediaMetadata(file);
+        const asset = await uploadAssetDirect(file, token, {
+          width: image.naturalWidth || null,
+          height: image.naturalHeight || null,
+        });
+
+        addElement({
+          id: crypto.randomUUID(),
+          type: 'image',
+          x: 180,
+          y: 140,
+          width: 420,
+          height: 300,
+          rotation: 0,
+          src: asset.url,
+        });
+      } finally {
+        URL.revokeObjectURL(objectUrl);
       }
-
-      const asset = await uploadAssetToCloudinary(file, token, metadata);
-
-      const isVideo = file.type.startsWith('video/');
-      const sourceWidth = asset.width || metadata.width || 720;
-      const sourceHeight = asset.height || metadata.height || (isVideo ? 405 : 720);
-      const maxWidth = 520;
-      const scale = Math.min(1, maxWidth / sourceWidth);
-      const width = Math.round(sourceWidth * scale);
-      const height = Math.round(sourceHeight * scale);
-
-      addElement({
-        id: crypto.randomUUID(),
-        type: isVideo ? 'video' : 'image',
-        x: Math.round((900 - width) / 2),
-        y: Math.round((600 - height) / 2),
-        width,
-        height,
-        rotation: 0,
-        src: asset.url,
-      });
     } catch (error) {
       window.alert(
         error instanceof Error ? error.message : 'Unable to upload image',
@@ -1303,7 +1232,6 @@ function CreateoraEditor() {
     setSelectedId(element.id);
     const rect = (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect();
     if (!rect) return;
-    interactionStartRef.current = elements;
     dragRef.current = {
       id: element.id,
       offsetX: event.clientX - rect.left - element.x * (zoom / 100),
@@ -1312,155 +1240,22 @@ function CreateoraEditor() {
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   };
 
-  const handleResizePointerDown = (event: PointerEvent, element: EditorElement, handle: string) => {
-    if (tool !== 'select') return;
-    event.stopPropagation();
-    event.preventDefault();
-    setSelectedId(element.id);
-    interactionStartRef.current = elements;
-    const rect = (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect();
-    if (!rect) return;
-    const scale = zoom / 100;
-    const left = element.x * scale;
-    const top = element.y * scale;
-    const width = element.width * scale;
-    const height = element.height * scale;
-    transformRef.current = {
-      mode: 'resize',
-      id: element.id,
-      handle,
-      startX: event.clientX,
-      startY: event.clientY,
-      startWidth: width,
-      startHeight: height,
-      startLeft: left,
-      startTop: top,
-      startRotation: element.rotation,
-      centerX: left + width / 2,
-      centerY: top + height / 2,
-      startAngle: 0,
-    };
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-  };
-
-  const handleRotatePointerDown = (event: PointerEvent, element: EditorElement) => {
-    if (tool !== 'select') return;
-    event.stopPropagation();
-    event.preventDefault();
-    setSelectedId(element.id);
-    interactionStartRef.current = elements;
-    const elementRect = (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect();
-    const canvasRect = elementRect?.parentElement?.getBoundingClientRect();
-    if (!canvasRect) return;
-    const scale = zoom / 100;
-    const centerX = element.x * scale + element.width * scale / 2;
-    const centerY = element.y * scale + element.height * scale / 2;
-    transformRef.current = {
-      mode: 'rotate',
-      id: element.id,
-      startX: event.clientX,
-      startY: event.clientY,
-      startWidth: element.width * scale,
-      startHeight: element.height * scale,
-      startLeft: element.x * scale,
-      startTop: element.y * scale,
-      startRotation: element.rotation,
-      centerX,
-      centerY,
-      startAngle: Math.atan2(
-        event.clientY - canvasRect.top - centerY,
-        event.clientX - canvasRect.left - centerX,
-      ),
-    };
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-  };
-
   const handlePointerMove = (event: React.PointerEvent) => {
-    const transform = transformRef.current;
-    const drag = dragRef.current;
-    const canvas = event.currentTarget as HTMLElement;
-    const rect = canvas.getBoundingClientRect();
+    if (!dragRef.current) return;
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const scale = zoom / 100;
-
-    if (transform?.mode === 'rotate') {
-      const angle = Math.atan2(
-        event.clientY - rect.top - transform.centerY,
-        event.clientX - rect.left - transform.centerX,
-      );
-      const rotation = Math.round(
-        transform.startRotation + (angle - transform.startAngle) * (180 / Math.PI),
-      );
-      setElements((current) => current.map((item) =>
-        item.id === transform.id ? { ...item, rotation } : item,
-      ));
-      return;
-    }
-
-    if (transform?.mode === 'resize') {
-      const dx = (event.clientX - transform.startX) / scale;
-      const dy = (event.clientY - transform.startY) / scale;
-      const handle = transform.handle ?? '';
-      const minSize = 32;
-      const startWidth = transform.startWidth / scale;
-      const startHeight = transform.startHeight / scale;
-      let x = transform.startLeft / scale;
-      let y = transform.startTop / scale;
-      let width = startWidth;
-      let height = startHeight;
-
-      if (handle.includes('e')) width = Math.max(minSize, startWidth + dx);
-      if (handle.includes('s')) height = Math.max(minSize, startHeight + dy);
-      if (handle.includes('w')) {
-        width = Math.max(minSize, startWidth - dx);
-        x = transform.startLeft / scale + dx;
-      }
-      if (handle.includes('n')) {
-        height = Math.max(minSize, startHeight - dy);
-        y = transform.startTop / scale + dy;
-      }
-
-      if (event.shiftKey) {
-        const aspect = startWidth / Math.max(startHeight, 1);
-        if (handle.includes('e') || handle.includes('w')) {
-          height = Math.max(minSize, width / aspect);
-          if (handle.includes('n')) y = transform.startTop / scale + (startHeight - height);
-        } else {
-          width = Math.max(minSize, height * aspect);
-          if (handle.includes('w')) x = transform.startLeft / scale + (startWidth - width);
-        }
-      }
-
-      x = Math.max(0, Math.min(900 - minSize, x));
-      y = Math.max(0, Math.min(600 - minSize, y));
-      width = Math.min(width, 900 - x);
-      height = Math.min(height, 600 - y);
-
-      setElements((current) => current.map((item) =>
-        item.id === transform.id ? { ...item, x, y, width: Math.max(minSize, width), height: Math.max(minSize, height) } : item,
-      ));
-      return;
-    }
-
-    if (!drag) return;
-    const x = Math.max(0, Math.min(900 - (selected?.width ?? 100), (event.clientX - rect.left - drag.offsetX) / scale));
-    const y = Math.max(0, Math.min(600 - (selected?.height ?? 80), (event.clientY - rect.top - drag.offsetY) / scale));
-    setElements((current) => current.map((item) => item.id === drag.id ? { ...item, x, y } : item));
+    const x = Math.max(0, Math.min(900 - (selected?.width ?? 100), (event.clientX - rect.left - dragRef.current.offsetX) / scale));
+    const y = Math.max(0, Math.min(600 - (selected?.height ?? 80), (event.clientY - rect.top - dragRef.current.offsetY) / scale));
+    setElements((current) => current.map((item) => item.id === dragRef.current?.id ? { ...item, x, y } : item));
   };
 
   const finishDrag = () => {
-    if (!dragRef.current && !transformRef.current) return;
-    if (interactionStartRef.current) {
-      const start = interactionStartRef.current;
-      if (JSON.stringify(start) !== JSON.stringify(elements)) {
-        setHistory((h) => [...h.slice(-19), start]);
-        setFuture([]);
-      }
-    }
+    if (!dragRef.current) return;
+    const current = elements;
+    setHistory((h) => [...h.slice(-19), current]);
+    setFuture([]);
     dragRef.current = null;
-    transformRef.current = null;
-    interactionStartRef.current = null;
   };
-
 
   return (
     <main className="createora-editor">
@@ -1489,7 +1284,7 @@ function CreateoraEditor() {
           <button className={tool === 'text' ? 'active' : ''} onClick={() => addText()}><Type size={19} /><span>Text</span></button>
           <button className={tool === 'shape' ? 'active' : ''} onClick={() => addShape()}><Square size={19} /><span>Shape</span></button>
           <button onClick={() => fileRef.current?.click()}><Upload size={19} /><span>Upload</span></button>
-          <button className={tool === 'media' ? 'active' : ''} onClick={() => { setTool('media'); setSelectedId(null); }}><ImagePlus size={19} /><span>Media</span></button>
+          <button onClick={() => setLocation('/assets')}><ImagePlus size={19} /><span>Media</span></button>
           <button className={tool === 'ai' ? 'active' : ''} onClick={() => { setTool('ai'); setSelectedId(null); }}><Sparkles size={19} /><span>AI</span></button>
           <div className="editor-tool-spacer" />
           <button><Grid2X2 size={18} /><span>Layers</span></button>
@@ -1518,40 +1313,13 @@ function CreateoraEditor() {
                     left: element.x * zoom / 100, top: element.y * zoom / 100,
                     width: element.width * zoom / 100, height: element.height * zoom / 100,
                     transform: `rotate(${element.rotation}deg)`,
-                    opacity: element.opacity ?? 1,
-                    filter: element.type === 'image' || element.type === 'video'
-                      ? `brightness(${element.brightness ?? 100}%) contrast(${element.contrast ?? 100}%) saturate(${element.saturation ?? 100}%) grayscale(${element.grayscale ?? 0}%)`
-                      : undefined,
                     background: element.type === 'shape' ? element.color : undefined,
                   }}
                   onPointerDown={(event) => handlePointerDown(event, element)}
                 >
                   {element.type === 'text' && <span>{element.text}</span>}
                   {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} />}
-                  {element.type === 'video' && element.src && <video src={element.src} muted playsInline preload="metadata" draggable={false} />}
-                  {selectedId === element.id && (
-                    <>
-                      <span className="editor-selection-label">{element.type.toUpperCase()}</span>
-                      <span className="editor-rotate-stem" aria-hidden="true" />
-                      <button
-                        type="button"
-                        className="editor-rotate-handle"
-                        aria-label="Rotate selected element"
-                        onPointerDown={(event) => handleRotatePointerDown(event, element)}
-                      >
-                        <RotateCw size={12} />
-                      </button>
-                      {['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map((handle) => (
-                        <button
-                          key={handle}
-                          type="button"
-                          className={`editor-resize-handle editor-resize-${handle}`}
-                          aria-label={`Resize ${handle}`}
-                          onPointerDown={(event) => handleResizePointerDown(event, element, handle)}
-                        />
-                      ))}
-                    </>
-                  )}
+                  {selectedId === element.id && <span className="editor-selection-label">{element.type.toUpperCase()}</span>}
                 </div>
               ))}
               {!elements.length && (
@@ -1640,45 +1408,7 @@ function CreateoraEditor() {
         </section>
 
         <aside className="editor-inspector">
-          {tool === 'media' ? (
-            <>
-              <div className="inspector-header"><strong>Media Library</strong><span>{mediaAssets.length} items</span></div>
-              <div className="editor-media-panel">
-                <div className="editor-media-panel-head">
-                  <strong>Place media</strong>
-                  <button onClick={() => setLocation('/assets')} title="Open full Media Library"><ArrowUpRight size={14} /></button>
-                </div>
-                <p>Select an image or video to place it on this project.</p>
-                {mediaError && <div className="editor-media-error">{mediaError}</div>}
-                {mediaLoading ? (
-                  <div className="editor-media-loading">Loading your media…</div>
-                ) : mediaAssets.length ? (
-                  <div className="editor-media-grid">
-                    {mediaAssets.map((asset) => (
-                      <button key={asset.id} className="editor-media-item" onClick={() => addMediaAsset(asset)} title={asset.name}>
-                        <span className="editor-media-thumb">
-                          {asset.type === 'video' ? (
-                            <video src={asset.url} muted playsInline preload="metadata" />
-                          ) : (
-                            <img src={asset.url} alt="" />
-                          )}
-                          <span className="editor-media-type">{asset.type === 'video' ? 'VIDEO' : 'IMAGE'}</span>
-                        </span>
-                        <strong>{asset.name}</strong>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="editor-media-empty">
-                    <ImagePlus size={20} />
-                    <strong>Your library is empty</strong>
-                    <span>Upload photos or videos from Media Library, then place them here.</span>
-                    <button onClick={() => setLocation('/assets')}>Open Media Library <ArrowRight size={13} /></button>
-                  </div>
-                )}
-              </div>
-            </>
-          ) : tool === 'ai' ? (
+          {tool === 'ai' ? (
             <>
               <div className="inspector-header"><strong>AI Image</strong><span>Gemini</span></div>
               <div className="ai-inspector-hero">
@@ -1757,36 +1487,6 @@ function CreateoraEditor() {
                     <label>Rotation</label>
                     <div className="inspector-slider"><RotateCw size={14} /><input id="element-rotation" name="element-rotation" type="range" min="-180" max="180" value={selected.rotation} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} /><span>{selected.rotation}°</span></div>
                   </div>
-
-                  {(selected.type === 'image' || selected.type === 'video') && (
-                    <div className="inspector-section media-adjustments">
-                      <div className="inspector-section-title">Adjustments</div>
-                      {[
-                        ['Opacity', 'opacity', 0.1, 1, 0.05, selected.opacity ?? 1],
-                        ['Brightness', 'brightness', 0, 200, 1, selected.brightness ?? 100],
-                        ['Contrast', 'contrast', 0, 200, 1, selected.contrast ?? 100],
-                        ['Saturation', 'saturation', 0, 200, 1, selected.saturation ?? 100],
-                        ['Grayscale', 'grayscale', 0, 100, 1, selected.grayscale ?? 0],
-                      ].map(([label, key, min, max, step, value]) => (
-                        <label className="adjustment-row" key={String(key)}>
-                          <span>{label}<strong>{key === 'opacity' ? Math.round(Number(value) * 100) : Math.round(Number(value))}%</strong></span>
-                          <input
-                            id={`element-${String(key)}`}
-                            name={`element-${String(key)}`}
-                            type="range"
-                            min={Number(min)}
-                            max={Number(max)}
-                            step={Number(step)}
-                            value={Number(value)}
-                            onChange={(e) => updateSelected({ [key]: Number(e.target.value) } as Partial<EditorElement>)}
-                          />
-                        </label>
-                      ))}
-                      <button className="adjustment-reset" onClick={() => updateSelected({ opacity: 1, brightness: 100, contrast: 100, saturation: 100, grayscale: 0 })}>
-                        Reset adjustments
-                      </button>
-                    </div>
-                  )}
                   <button className="inspector-delete" onClick={removeSelected}><Trash2 size={15} /> Delete layer</button>
                 </>
               ) : (
@@ -1799,28 +1499,6 @@ function CreateoraEditor() {
     </main>
   );
 }
-
-const getBrowserMediaMetadata = async (file: File) => {
-  const url = URL.createObjectURL(file);
-  try {
-    const media = document.createElement(file.type.startsWith('video/') ? 'video' : 'audio');
-    media.preload = 'metadata';
-    media.src = url;
-
-    await new Promise<void>((resolve, reject) => {
-      media.onloadedmetadata = () => resolve();
-      media.onerror = () => reject(new Error('Unable to read media metadata'));
-    });
-
-    return {
-      width: file.type.startsWith('video/') ? media.videoWidth || null : null,
-      height: file.type.startsWith('video/') ? media.videoHeight || null : null,
-      duration: Number.isFinite(media.duration) ? media.duration : null,
-    };
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-};
 
 type MediaAsset = { id: string; clerkUserId: string; name: string; type: string; mimeType: string | null; url: string; thumbnailUrl: string | null; storageKey: string | null; source: string; width: number | null; height: number | null; duration: number | null; size: number | null; createdAt: string; };
 const formatAssetBytes = (bytes: number | null) => { if (!bytes) return '—'; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`; if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`; return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`; };
@@ -1860,17 +1538,7 @@ function MediaLibraryPage() {
         const file = files[index];
         const metadata = await getMediaMetadata(file);
 
-        await uploadAssetToCloudinary(
-          file,
-          token,
-          metadata,
-          (fileProgress) => {
-            const completedFiles = index;
-            const overallProgress =
-              ((completedFiles + fileProgress / 100) / files.length) * 100;
-            setProgress(Math.round(overallProgress));
-          },
-        );
+        await uploadAssetDirect(file, token, metadata);
 
         setProgress(Math.round(((index + 1) / files.length) * 100));
       }
@@ -1914,124 +1582,61 @@ function AppRoutes() {
   );
 }
 
-type CloudinaryUploadMetadata = {
+type DirectUploadMetadata = {
   width?: number | null;
   height?: number | null;
   duration?: number | null;
 };
 
-type CloudinaryUploadProgress = (percent: number) => void;
-
-async function uploadAssetToCloudinary(
+async function uploadAssetDirect(
   file: File,
   token: string,
-  metadata: CloudinaryUploadMetadata = {},
-  onProgress?: CloudinaryUploadProgress,
+  metadata: DirectUploadMetadata = {},
 ) {
-  const signatureResponse = await fetch('/api/assets/cloudinary/signature', {
+  const response = await fetch('/api/assets/upload-direct', {
     method: 'POST',
     headers: {
       Accept: 'application/json',
-      'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
+      'Content-Type': file.type,
+      'X-Asset-Name': encodeURIComponent(file.name),
+      'X-Asset-Size': String(file.size),
+      'X-Asset-Width': metadata.width == null ? '' : String(metadata.width),
+      'X-Asset-Height': metadata.height == null ? '' : String(metadata.height),
+      'X-Asset-Duration':
+        metadata.duration == null ? '' : String(metadata.duration),
     },
-    body: JSON.stringify({
-      contentType: file.type,
-    }),
+    body: file,
   });
 
-  const signatureData = await signatureResponse.json();
+  const raw = await response.text();
 
-  if (!signatureResponse.ok) {
+  let data: {
+    asset?: MediaAsset;
+    error?: string;
+  } = {};
+
+  if (raw.trim()) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new Error(
+        `Upload server returned an invalid response (HTTP ${response.status}).`,
+      );
+    }
+  }
+
+  if (!response.ok) {
     throw new Error(
-      signatureData.error || 'Unable to prepare Cloudinary upload.',
+      data.error || `Upload failed (HTTP ${response.status}).`,
     );
   }
 
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('api_key', signatureData.apiKey);
-  formData.append('timestamp', String(signatureData.timestamp));
-  formData.append('signature', signatureData.signature);
-  formData.append('public_id', signatureData.publicId);
-
-  const cloudinaryResponse = await new Promise<any>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-
-    xhr.open(
-      'POST',
-      `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/${signatureData.resourceType}/upload`,
-    );
-    xhr.responseType = 'json';
-
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        onProgress?.(Math.round((event.loaded / event.total) * 100));
-      }
-    };
-
-    xhr.onerror = () => reject(new Error('Cloudinary upload failed.'));
-    xhr.onabort = () => reject(new Error('Cloudinary upload was cancelled.'));
-    xhr.onload = () => {
-      const data = xhr.response;
-
-      if (xhr.status < 200 || xhr.status >= 300) {
-        reject(
-          new Error(
-            data?.error?.message ||
-              `Cloudinary upload failed (HTTP ${xhr.status}).`,
-          ),
-        );
-        return;
-      }
-
-      if (!data) {
-        reject(new Error('Cloudinary returned an empty upload response.'));
-        return;
-      }
-
-      resolve(data);
-    };
-
-    xhr.send(formData);
-  });
-
-  const finalizeResponse = await fetch('/api/assets/cloudinary/finalize', {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      publicId: cloudinaryResponse.public_id,
-      signature: cloudinaryResponse.signature,
-      version: cloudinaryResponse.version,
-      secureUrl: cloudinaryResponse.secure_url,
-      resourceType: cloudinaryResponse.resource_type,
-      name: file.name,
-      mimeType: file.type,
-      width: cloudinaryResponse.width ?? metadata.width ?? null,
-      height: cloudinaryResponse.height ?? metadata.height ?? null,
-      duration: cloudinaryResponse.duration ?? metadata.duration ?? null,
-      bytes: cloudinaryResponse.bytes ?? file.size,
-    }),
-  });
-
-  const finalizeData = await finalizeResponse.json();
-
-  if (!finalizeResponse.ok) {
-    throw new Error(
-      finalizeData.error || 'Cloudinary upload completed but could not be saved.',
-    );
+  if (!data.asset) {
+    throw new Error('Upload completed but no asset was returned.');
   }
 
-  if (!finalizeData.asset) {
-    throw new Error('Cloudinary upload completed but no asset was returned.');
-  }
-
-  onProgress?.(100);
-  return finalizeData.asset as MediaAsset;
+  return data.asset;
 }
 
 function RoutedErrorBoundary({ children }: { children: ReactNode }) {
