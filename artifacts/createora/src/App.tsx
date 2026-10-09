@@ -895,7 +895,32 @@ type EditorElement = {
   text?: string;
   color?: string;
   src?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  fontWeight?: number;
+  textAlign?: 'left' | 'center' | 'right';
+  italic?: boolean;
+  opacity?: number;
+  borderRadius?: number;
+  brightness?: number;
+  contrast?: number;
+  saturation?: number;
+  grayscale?: number;
+  blur?: number;
+  fit?: 'cover' | 'contain';
+  flipX?: boolean;
+  flipY?: boolean;
+  strokeColor?: string;
+  strokeWidth?: number;
 };
+
+const canvasPresets = [
+  { label: 'Square post · 1080 × 1080', width: 1080, height: 1080 },
+  { label: 'Portrait post · 1080 × 1350', width: 1080, height: 1350 },
+  { label: 'Story / Reel · 1080 × 1920', width: 1080, height: 1920 },
+  { label: 'Landscape · 1200 × 675', width: 1200, height: 675 },
+  { label: 'Classic landscape · 900 × 600', width: 900, height: 600 },
+];
 
 function CreateoraEditor() {
   const { isLoaded, isSignedIn, user, getToken } = useAuth();
@@ -916,12 +941,20 @@ function CreateoraEditor() {
   const [zoom, setZoom] = useState(72);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [showGuides, setShowGuides] = useState(true);
-  const [cropMode, setCropMode] = useState(false);
   const [snapGuides, setSnapGuides] = useState<{ x?: number; y?: number }>({});
+  const [canvasWidth, setCanvasWidth] = useState(1080);
+  const [canvasHeight, setCanvasHeight] = useState(1080);
+  const [canvasBackground, setCanvasBackground] = useState('#ffffff');
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [history, setHistory] = useState<EditorElement[][]>([]);
   const [future, setFuture] = useState<EditorElement[][]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
-  const dragRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
+  const canvasWrapRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{
+    id: string; mode: 'move' | 'resize'; offsetX: number; offsetY: number;
+    handle?: string; startClientX?: number; startClientY?: number;
+    startX?: number; startY?: number; startWidth?: number; startHeight?: number;
+  } | null>(null);
   const [projectName, setProjectName] = useState('Untitled design');
   const [projectId, setProjectId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('project'));
   const [projectReady, setProjectReady] = useState(false);
