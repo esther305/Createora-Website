@@ -903,6 +903,7 @@ function CreateoraEditor() {
   const [elements, setElements] = useState<EditorElement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [layersOpen, setLayersOpen] = useState(true);
+  const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
   const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(() => new Set());
   const [lockedLayers, setLockedLayers] = useState<Set<string>>(() => new Set());
   const [layerNames, setLayerNames] = useState<Record<string, string>>({});
@@ -1405,7 +1406,7 @@ function CreateoraEditor() {
 
         <section className="editor-stage">
           <div className="editor-stage-head">
-            <div><span>DESIGN</span><strong>1080 × 1080</strong></div>
+            <div><span>DESIGN</span><strong>1080 × 1080</strong><button className="mobile-inspector-toggle" onClick={() => setMobileInspectorOpen((open) => !open)} aria-expanded={mobileInspectorOpen}>{mobileInspectorOpen ? 'Hide properties' : 'Properties'}</button></div>
             <div className="editor-zoom"><button onClick={() => setZoom(Math.max(40, zoom - 10))}>−</button><span>{zoom}%</span><button onClick={() => setZoom(Math.min(120, zoom + 10))}><ZoomIn size={14} /></button></div>
           </div>
           <div className="editor-canvas-wrap">
@@ -1526,10 +1527,10 @@ function CreateoraEditor() {
           )}
         </section>
 
-        <aside className="editor-inspector">
+        <aside className={`editor-inspector ${mobileInspectorOpen ? 'mobile-open' : ''}`}>
           {tool === 'ai' ? (
             <>
-              <div className="inspector-header"><strong>AI Image</strong><span>Gemini</span></div>
+              <div className="inspector-header"><strong>AI Image</strong><span>Gemini</span><button className="mobile-inspector-close" onClick={() => setMobileInspectorOpen(false)}>Close</button></div>
               <div className="ai-inspector-hero">
                 <div className="ai-inspector-icon"><Sparkles size={18} /></div>
                 <strong>Generate a visual</strong>
@@ -1560,7 +1561,7 @@ function CreateoraEditor() {
             </>
           ) : (
             <>
-              <div className="inspector-header"><strong>Properties</strong><span>{selected ? selected.type : 'Canvas'}</span></div>
+              <div className="inspector-header"><strong>Properties</strong><span>{selected ? selected.type : 'Canvas'}</span><button className="mobile-inspector-close" onClick={() => setMobileInspectorOpen(false)}>Close</button></div>
               {selected ? (
                 <>
                   <div className="inspector-section">
