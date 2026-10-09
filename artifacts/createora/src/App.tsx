@@ -1524,7 +1524,9 @@ function CreateoraEditor() {
           if ((element.fit ?? 'cover') === 'contain') {
             const fitScale = Math.min(width / sourceWidth, height / sourceHeight);
             const drawWidth = sourceWidth * fitScale, drawHeight = sourceHeight * fitScale;
-            ctx.drawImage(drawable, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+            const drawX = left + (width - drawWidth) * ((element.cropX ?? 50) / 100);
+            const drawY = top + (height - drawHeight) * ((element.cropY ?? 50) / 100);
+            ctx.drawImage(drawable, drawX, drawY, drawWidth, drawHeight);
           } else {
             const sourceAspect = sourceWidth / sourceHeight, frameAspect = width / height;
             let sx = 0, sy = 0, sw = sourceWidth, sh = sourceHeight;
