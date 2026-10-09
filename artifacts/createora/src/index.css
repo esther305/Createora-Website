@@ -1846,3 +1846,8 @@ button,input,textarea,select{max-width:100%}
 .editor-save-dot.save-status-error { background:#e36c69; box-shadow:0 0 9px rgba(227,108,105,.65); }
 .editor-save-dot.save-status-saving { animation:editor-save-pulse 1.25s ease-in-out infinite; }
 @keyframes editor-save-pulse { 0%,100% { opacity:1; } 50% { opacity:.42; } }
+
+.editor-element { box-sizing:border-box; }
+.editor-element-text { box-sizing:border-box; }
+.editor-element-image img,.editor-element-video video { max-width:none; }
+
