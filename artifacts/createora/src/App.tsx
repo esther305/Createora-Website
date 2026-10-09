@@ -913,6 +913,10 @@ type EditorElement = {
   strokeColor?: string;
   strokeWidth?: number;
   shapeKind?: 'rectangle' | 'ellipse';
+  cropX?: number;
+  cropY?: number;
+  shadow?: number;
+  shadowColor?: string;
 };
 
 const canvasPresets = [
@@ -1429,6 +1433,10 @@ function CreateoraEditor() {
         const x = element.x, y = element.y, width = element.width, height = element.height;
         ctx.save();
         ctx.globalAlpha = Math.max(0, Math.min(1, element.opacity ?? 1));
+        ctx.shadowColor = element.shadowColor || 'rgba(0,0,0,0.30)';
+        ctx.shadowBlur = Math.max(0, element.shadow ?? 0);
+        ctx.shadowOffsetX = Math.max(0, (element.shadow ?? 0) * 0.15);
+        ctx.shadowOffsetY = Math.max(0, (element.shadow ?? 0) * 0.35);
         ctx.translate(x + width / 2, y + height / 2);
         ctx.rotate((element.rotation * Math.PI) / 180);
         ctx.scale(element.flipX ? -1 : 1, element.flipY ? -1 : 1);
@@ -1507,8 +1515,8 @@ function CreateoraEditor() {
           } else {
             const sourceAspect = sourceWidth / sourceHeight, frameAspect = width / height;
             let sx = 0, sy = 0, sw = sourceWidth, sh = sourceHeight;
-            if (sourceAspect > frameAspect) { sw = sourceHeight * frameAspect; sx = (sourceWidth - sw) / 2; }
-            else { sh = sourceWidth / frameAspect; sy = (sourceHeight - sh) / 2; }
+            if (sourceAspect > frameAspect) { sw = sourceHeight * frameAspect; sx = (sourceWidth - sw) * ((element.cropX ?? 50) / 100); }
+            else { sh = sourceWidth / frameAspect; sy = (sourceHeight - sh) * ((element.cropY ?? 50) / 100); }
             ctx.drawImage(drawable, sx, sy, sw, sh, left, top, width, height);
           }
           ctx.filter = 'none';
@@ -1731,12 +1739,13 @@ function CreateoraEditor() {
                     opacity: element.opacity ?? 1,
                     borderRadius: element.type === 'shape' && element.shapeKind === 'ellipse' ? '50%' : (element.borderRadius ?? (element.type === 'shape' ? 18 : element.type === 'image' ? 4 : 0)) + 'px',
                     border: element.strokeColor && (element.strokeWidth ?? 0) > 0 ? (element.strokeWidth + 'px solid ' + element.strokeColor) : undefined,
+                    boxShadow: (element.shadow ?? 0) > 0 ? '0 ' + (element.shadow ?? 0) * 0.35 + 'px ' + (element.shadow ?? 0) * 2 + 'px ' + (element.shadowColor || 'rgba(0,0,0,.30)') : undefined,
                   }}
                   onPointerDown={(event) => { if (lockedLayers.has(element.id) || hiddenLayers.has(element.id)) { event.stopPropagation(); setSelectedId(element.id); return; } handlePointerDown(event, element); }}
                 >
                   {element.type === 'text' && <span>{element.text}</span>}
-                  {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} style={{ objectFit: element.fit ?? "cover", borderRadius: (element.borderRadius ?? 4) + "px", filter: "brightness(" + (element.brightness ?? 100) + "%) contrast(" + (element.contrast ?? 100) + "%) saturate(" + (element.saturation ?? 100) + "%) grayscale(" + (element.grayscale ?? 0) + "%) blur(" + (element.blur ?? 0) + "px)" }} />}
-                  {element.type === 'video' && element.src && <video src={element.src} muted playsInline preload="metadata" draggable={false} style={{ objectFit: element.fit ?? "cover", borderRadius: (element.borderRadius ?? 4) + "px", filter: "brightness(" + (element.brightness ?? 100) + "%) contrast(" + (element.contrast ?? 100) + "%) saturate(" + (element.saturation ?? 100) + "%) grayscale(" + (element.grayscale ?? 0) + "%) blur(" + (element.blur ?? 0) + "px)" }} />}
+                  {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} style={{ objectFit: element.fit ?? "cover", objectPosition: (element.cropX ?? 50) + "% " + (element.cropY ?? 50) + "%", borderRadius: (element.borderRadius ?? 4) + "px", filter: "brightness(" + (element.brightness ?? 100) + "%) contrast(" + (element.contrast ?? 100) + "%) saturate(" + (element.saturation ?? 100) + "%) grayscale(" + (element.grayscale ?? 0) + "%) blur(" + (element.blur ?? 0) + "px)" }} />}
+                  {element.type === 'video' && element.src && <video src={element.src} muted playsInline preload="metadata" draggable={false} style={{ objectFit: element.fit ?? "cover", objectPosition: (element.cropX ?? 50) + "% " + (element.cropY ?? 50) + "%", borderRadius: (element.borderRadius ?? 4) + "px", filter: "brightness(" + (element.brightness ?? 100) + "%) contrast(" + (element.contrast ?? 100) + "%) saturate(" + (element.saturation ?? 100) + "%) grayscale(" + (element.grayscale ?? 0) + "%) blur(" + (element.blur ?? 0) + "px)" }} />}
                   {selectedId === element.id && <span className="editor-selection-label">{element.type.toUpperCase()}</span>}
                   {selectedId === element.id && tool === "select" && !lockedLayers.has(element.id) && ["nw", "n", "ne", "e", "se", "s", "sw", "w"].map((handle) => <button type="button" key={handle} className={"editor-transform-handle handle-" + handle} aria-label={"Resize " + element.type + " " + handle} onPointerDown={(event) => startResize(event, element, handle)} />)}
                 </div>
@@ -1904,13 +1913,21 @@ function CreateoraEditor() {
                         <button className={selectedMedia.fit === 'contain' ? 'active' : ''} onClick={() => updateSelected({ fit: 'contain' })}>Fit image</button>
                         <button onClick={() => updateSelected({ flipX: !selectedMedia.flipX })}>Flip H</button>
                         <button onClick={() => updateSelected({ flipY: !selectedMedia.flipY })}>Flip V</button>
-                        <button onClick={() => updateSelected({ rotation: 0, flipX: false, flipY: false })}>Reset</button>
+                        <button onClick={() => updateSelected({ rotation: 0, flipX: false, flipY: false, cropX: 50, cropY: 50 })}>Reset</button>
                         <button className={snapEnabled ? 'active' : ''} onClick={() => setSnapEnabled((enabled) => !enabled)}><Target size={13} /> Snap</button>
                         <button onClick={() => updateSelected({ x: Math.max(0, Math.round((canvasWidth - selectedMedia.width) / 2)) })}>Center H</button>
                         <button onClick={() => updateSelected({ y: Math.max(0, Math.round((canvasHeight - selectedMedia.height) / 2)) })}>Center V</button>
                       </div>
                     </div>
                   )}
+
+                  {(selected.type === 'image' || selected.type === 'video') && <div className="inspector-section">
+                    <label>Crop focus · {selected.fit === 'contain' ? 'Fit mode' : 'Fill mode'}</label>
+                    <div className="inspector-control-stack">
+                      <label>Horizontal · {selected.cropX ?? 50}%<input type="range" min="0" max="100" value={selected.cropX ?? 50} onChange={(event) => updateSelected({ cropX: Number(event.target.value) })} /></label>
+                      <label>Vertical · {selected.cropY ?? 50}%<input type="range" min="0" max="100" value={selected.cropY ?? 50} onChange={(event) => updateSelected({ cropY: Number(event.target.value) })} /></label>
+                    </div>
+                  </div>}
 
                   {(selected.type === 'image' || selected.type === 'video') && <div className="inspector-section">
                     <label>Image adjustments</label>
@@ -1938,6 +1955,14 @@ function CreateoraEditor() {
                   <div className="inspector-section">
                     <label>Opacity · {Math.round((selected.opacity ?? 1) * 100)}%</label>
                     <div className="inspector-slider"><input aria-label="Layer opacity" type="range" min="0" max="1" step="0.01" value={selected.opacity ?? 1} onChange={(event) => updateSelected({ opacity: Number(event.target.value) })} /></div>
+                  </div>
+
+                  <div className="inspector-section">
+                    <label>Shadow · {selected.shadow ?? 0}px</label>
+                    <div className="inspector-control-stack">
+                      <input aria-label="Shadow color" className="inspector-color-input" type="color" value={selected.shadowColor || '#000000'} onChange={(event) => updateSelected({ shadowColor: event.target.value })} />
+                      <input aria-label="Shadow strength" type="range" min="0" max="40" value={selected.shadow ?? 0} onChange={(event) => updateSelected({ shadow: Number(event.target.value) })} />
+                    </div>
                   </div>
 
                   {selected.type === 'video' && (
