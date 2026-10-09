@@ -943,6 +943,7 @@ function CreateoraEditor() {
   const [aiImage, setAiImage] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [backgroundRemoving, setBackgroundRemoving] = useState(false);
   const [zoom, setZoom] = useState(72);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [showGuides, setShowGuides] = useState(true);
@@ -1360,6 +1361,67 @@ function CreateoraEditor() {
     if (!selectedId) return;
     const next = elements.map((element) => element.id === selectedId ? { ...element, ...patch } : element);
     commit(next);
+  };
+
+  const removePortraitBackground = async () => {
+    if (!selected || selected.type !== 'image' || !selected.src || backgroundRemoving) return;
+    setBackgroundRemoving(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Your session expired. Please sign in again.');
+      // Xenova/modnet is Apache-2.0 licensed and runs in-browser. Load the model only on demand.
+      const moduleUrl = 'https://esm.sh/@huggingface/transformers@3.7.2';
+      const transformers = await import(/* @vite-ignore */ moduleUrl) as {
+        pipeline: (task: string, model: string) => Promise<(image: Blob | string) => Promise<Array<{ toCanvas: () => HTMLCanvasElement }>>>;
+      };
+      const sourceResponse = await fetch(selected.src);
+      if (!sourceResponse.ok) throw new Error('Could not load this image. Try uploading it again.');
+      const sourceBlob = await sourceResponse.blob();
+      const sourceUrl = URL.createObjectURL(sourceBlob);
+      try {
+        const image = new Image();
+        image.src = sourceUrl;
+        await new Promise<void>((resolve, reject) => {
+          image.onload = () => resolve();
+          image.onerror = () => reject(new Error('Could not read the selected image.'));
+        });
+        const segmenter = await transformers.pipeline('background-removal', 'Xenova/modnet');
+        const masks = await segmenter(sourceBlob);
+        const maskCanvas = masks[0]?.toCanvas();
+        if (!maskCanvas) throw new Error('The background model did not return a mask.');
+        const output = document.createElement('canvas');
+        output.width = image.naturalWidth;
+        output.height = image.naturalHeight;
+        const context = output.getContext('2d', { willReadFrequently: true });
+        if (!context) throw new Error('Your browser could not process this image.');
+        context.drawImage(image, 0, 0, output.width, output.height);
+        const pixels = context.getImageData(0, 0, output.width, output.height);
+        const mask = document.createElement('canvas');
+        mask.width = output.width;
+        mask.height = output.height;
+        const maskContext = mask.getContext('2d', { willReadFrequently: true });
+        if (!maskContext) throw new Error('Your browser could not process the background mask.');
+        maskContext.drawImage(maskCanvas, 0, 0, mask.width, mask.height);
+        const maskPixels = maskContext.getImageData(0, 0, mask.width, mask.height);
+        for (let i = 0; i < pixels.data.length; i += 4) {
+          const alpha = (maskPixels.data[i] * 0.299 + maskPixels.data[i + 1] * 0.587 + maskPixels.data[i + 2] * 0.114) / 255;
+          pixels.data[i + 3] = Math.round(pixels.data[i + 3] * alpha);
+        }
+        context.putImageData(pixels, 0, 0);
+        const resultBlob = await new Promise<Blob>((resolve, reject) => {
+          output.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Could not export the transparent image.')), 'image/png');
+        });
+        const resultFile = new File([resultBlob], 'createora-background-removed.png', { type: 'image/png' });
+        const asset = await uploadAssetDirect(resultFile, token, { width: output.width, height: output.height });
+        updateSelected({ src: asset.url, fit: 'contain', cropX: 50, cropY: 50 });
+      } finally {
+        URL.revokeObjectURL(sourceUrl);
+      }
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Unable to remove the background.');
+    } finally {
+      setBackgroundRemoving(false);
+    }
   };
 
   const removeLayer = (id: string) => {
@@ -1956,6 +2018,12 @@ function CreateoraEditor() {
                   </div>}
 
                   {(selected.type === 'image' || selected.type === 'video') && <div className="inspector-section">
+                    {selected.type === 'image' && <div className="inspector-control-stack" style={{ marginBottom: 14 }}>
+                      <div className="inspector-note">Portrait background removal runs in your browser. The first use downloads the model.</div>
+                      <button className="inspector-reset-button" onClick={() => void removePortraitBackground()} disabled={backgroundRemoving}>
+                        {backgroundRemoving ? <><span className="ai-spinner" /> Removing background…</> : <><WandSparkles size={14} /> Remove portrait background</>}
+                      </button>
+                    </div>}
                     <label>Image adjustments</label>
                     <div className="inspector-control-stack">
                       <div className="image-filter-presets"><button onClick={() => updateSelected({ brightness: 100, contrast: 100, saturation: 100, grayscale: 0, blur: 0 })}>Original</button><button onClick={() => updateSelected({ brightness: 100, contrast: 110, saturation: 0, grayscale: 100, blur: 0 })}>B&amp;W</button><button onClick={() => updateSelected({ brightness: 105, contrast: 102, saturation: 125, grayscale: 0, blur: 0 })}>Warm</button><button onClick={() => updateSelected({ brightness: 100, contrast: 135, saturation: 115, grayscale: 0, blur: 0 })}>Drama</button></div>
