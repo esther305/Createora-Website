@@ -1821,3 +1821,22 @@ button,input,textarea,select{max-width:100%}
   .editor-transform-handle.handle-w { left:-7px; }
   .inspector-section { padding:14px 13px; }
 }
+
+
+.image-filter-presets { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
+.image-filter-presets button {
+  min-height:28px;
+  padding:0 3px;
+  border:1px solid #303832;
+  border-radius:5px;
+  background:#202622;
+  color:#a8b3aa;
+  font-size:8px;
+}
+.image-filter-presets button:hover { border-color:#4a9964; color:#9bdfae; }
+.inspector-canvas-settings .inspector-section { display:grid; gap:10px; }
+.inspector-canvas-settings .inspector-section > label { margin-bottom:0; }
+.editor-transform-tools .transform-tool-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+@media(max-width:760px) {
+  .image-filter-presets button { min-height:34px; }
+}
