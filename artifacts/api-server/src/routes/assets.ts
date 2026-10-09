@@ -136,7 +136,7 @@ router.post("/assets/cloudinary/finalize", async (req, res) => {
   }
 
   try {
-    const { client: cloudinary, cloudName, apiKey, apiSecret } = getCloudinary();
+    const { client: cloudinary, cloudName, apiKey } = getCloudinary();
 
     const expectedPrefix = `https://res.cloudinary.com/${cloudName}/`;
     if (!secureUrl.startsWith(expectedPrefix)) {
@@ -144,10 +144,12 @@ router.post("/assets/cloudinary/finalize", async (req, res) => {
       return;
     }
 
+    // Cloudinary Node SDK 2.11.0 expects (public_id, version, signature).
+    // It reads the API secret from the SDK config set by getCloudinary().
     const verified = cloudinary.utils.verify_api_response_signature(
-      { public_id: publicId, version },
+      publicId,
+      version,
       responseSignature,
-      apiSecret,
     );
 
     if (!verified) {
