@@ -241,9 +241,12 @@ router.post("/ai/images/generate", async (req, res) => {
   const geminiKey = process.env.GEMINI_API_KEY;
   const hfToken = process.env.HF_TOKEN;
 
+  const configuredGeminiModel = process.env.CREATEORA_IMAGE_MODEL?.trim();
+  // Ignore the obsolete model name previously used by Createora.
   const geminiModel =
-    process.env.CREATEORA_IMAGE_MODEL ||
-    "gemini-2.5-flash-image";
+    configuredGeminiModel && configuredGeminiModel !== "gemini-nano-banana-2.1"
+      ? configuredGeminiModel
+      : "gemini-2.5-flash-image";
 
   const hfModel =
     process.env.HF_IMAGE_MODEL ||
