@@ -243,7 +243,7 @@ router.post("/ai/images/generate", async (req, res) => {
 
   const geminiModel =
     process.env.CREATEORA_IMAGE_MODEL ||
-    "gemini-3.1-flash-image";
+    "gemini-nano-banana-2.1";
 
   const hfModel =
     process.env.HF_IMAGE_MODEL ||
@@ -424,10 +424,8 @@ router.post("/ai/images/generate", async (req, res) => {
       gemini: Boolean(geminiKey),
       huggingface: Boolean(hfToken),
     },
-    details:
-      process.env.NODE_ENV === "production"
-        ? undefined
-        : errors,
+    // Provider errors are useful for troubleshooting and contain no API credentials.
+    details: errors.map((message) => message.slice(0, 240)),
   });
 });
 
