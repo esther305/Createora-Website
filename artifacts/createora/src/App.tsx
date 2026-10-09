@@ -1015,17 +1015,21 @@ function CreateoraEditor() {
           const response = await fetch(`/api/projects/${requestedId}`, { headers: { Authorization: `Bearer ${token}` } });
           const data = await response.json();
           if (!response.ok) throw new Error(data.error || 'Unable to open project');
-          const documentData = data.project.document as { elements?: unknown[] } | null;
+          const documentData = data.project.document as { elements?: unknown[]; canvasWidth?: number; canvasHeight?: number; canvasBackground?: string } | null;
           const savedElements = Array.isArray(documentData?.elements) ? documentData.elements as EditorElement[] : [];
           if (!cancelled) {
             setProjectId(data.project.id);
             setProjectName(data.project.name);
             setElements(savedElements);
+            // Backwards compatibility for documents created before configurable canvas sizes.
+            setCanvasWidth(Number(documentData?.canvasWidth) || 900);
+            setCanvasHeight(Number(documentData?.canvasHeight) || 600);
+            setCanvasBackground(typeof documentData?.canvasBackground === 'string' ? documentData.canvasBackground : '#ffffff');
             setProjectReady(true);
           }
           return;
         }
-        const response = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: 'Untitled design', type: 'image', width: 1080, height: 1080 }) });
+        const response = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: 'Untitled design', type: 'image', width: canvasWidth, height: canvasHeight }) });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Unable to create project');
         if (!cancelled) {
@@ -1079,12 +1083,12 @@ function CreateoraEditor() {
         try {
           const token = await getToken();
           if (!token) return;
-          await fetch(`/api/projects/${projectId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: projectName, document: { version: 1, elements } }) });
+          await fetch(`/api/projects/${projectId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: projectName, document: { version: 2, elements, canvasWidth, canvasHeight, canvasBackground } }) });
         } catch {}
       })();
     }, 650);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [elements, projectName, projectId, projectReady]);
+  }, [elements, projectName, projectId, projectReady, canvasWidth, canvasHeight, canvasBackground]);
 
 
 
@@ -1153,8 +1157,8 @@ function CreateoraEditor() {
     addElement({
       id: crypto.randomUUID(),
       type: 'image',
-      x: Math.round((900 - size.width) / 2),
-      y: Math.round((600 - size.height) / 2),
+      x: Math.round((canvasWidth - size.width) / 2),
+      y: Math.round((canvasHeight - size.height) / 2),
       width: size.width,
       height: size.height,
       rotation: 0,
@@ -1180,13 +1184,13 @@ function CreateoraEditor() {
   };
 
   const addText = () => addElement({
-    id: crypto.randomUUID(), type: 'text', x: 240, y: 190, width: 420, height: 90,
-    rotation: 0, text: 'Your headline', color: '#151915'
+    id: crypto.randomUUID(), type: 'text', x: 240, y: 190, width: 520, height: 120,
+    rotation: 0, text: 'Your headline', color: '#151915', fontSize: 52, fontFamily: 'DM Sans', fontWeight: 800, textAlign: 'left', opacity: 1
   });
 
   const addShape = () => addElement({
     id: crypto.randomUUID(), type: 'shape', x: 270, y: 240, width: 260, height: 160,
-    rotation: 0, color: '#2f9e64'
+    rotation: 0, color: '#2f9e64', opacity: 1, borderRadius: 18
   });
 
   const onUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -1253,8 +1257,8 @@ function CreateoraEditor() {
     const copy = {
       ...selected,
       id: crypto.randomUUID(),
-      x: Math.min(900 - selected.width, selected.x + 24),
-      y: Math.min(600 - selected.height, selected.y + 24),
+      x: Math.max(0, Math.min(canvasWidth - selected.width, selected.x + 24)),
+      y: Math.max(0, Math.min(canvasHeight - selected.height, selected.y + 24)),
       startTime: selected.startTime != null ? selected.startTime + 1 : undefined,
     };
     addElement(copy);
