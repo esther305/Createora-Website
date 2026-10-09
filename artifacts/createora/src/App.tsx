@@ -1938,6 +1938,15 @@ function CreateoraEditor() {
                     </div>
                   )}
 
+                  {selectedMedia && <div className="inspector-section">
+                    <label>Frame styling</label>
+                    <div className="inspector-control-stack">
+                      <label>Corner radius · {selectedMedia.borderRadius ?? 4}px<input type="range" min="0" max="100" value={selectedMedia.borderRadius ?? 4} onChange={(event) => updateSelected({ borderRadius: Number(event.target.value) })} /></label>
+                      <label>Border width · {selectedMedia.strokeWidth ?? 0}px<input type="range" min="0" max="20" value={selectedMedia.strokeWidth ?? 0} onChange={(event) => updateSelected({ strokeWidth: Number(event.target.value) })} /></label>
+                      <label>Border color<input type="color" className="inspector-color-input" value={selectedMedia.strokeColor || '#ffffff'} onChange={(event) => updateSelected({ strokeColor: event.target.value, strokeWidth: selectedMedia.strokeWidth ?? 2 })} /></label>
+                    </div>
+                  </div>}
+
                   {(selected.type === 'image' || selected.type === 'video') && <div className="inspector-section">
                     <label>Crop focus · {selected.fit === 'contain' ? 'Fit mode' : 'Fill mode'}</label>
                     <div className="inspector-control-stack">
