@@ -1416,6 +1416,7 @@ function CreateoraEditor() {
   const exportImage = async (format: 'png' | 'jpeg') => {
     setExportMenuOpen(false);
     try {
+      await document.fonts.ready;
       const scale = 2;
       const output = document.createElement('canvas');
       output.width = canvasWidth * scale;
@@ -1745,22 +1746,23 @@ function CreateoraEditor() {
                     transform: 'rotate(' + element.rotation + 'deg) scaleX(' + (element.flipX ? -1 : 1) + ') scaleY(' + (element.flipY ? -1 : 1) + ')',
                     background: element.type === 'shape' ? element.color : undefined,
                     color: element.type === 'text' ? element.color || '#151915' : undefined,
-                    fontSize: element.type === 'text' ? (element.fontSize ?? 45) + 'px' : undefined,
+                    fontSize: element.type === 'text' ? ((element.fontSize ?? 45) * zoom / 100) + 'px' : undefined,
+                    padding: element.type === 'text' ? (10 * zoom / 100) + 'px' : undefined,
                     fontFamily: element.type === 'text' ? element.fontFamily || 'DM Sans' : undefined,
                     fontWeight: element.type === 'text' ? element.fontWeight ?? 800 : undefined,
                     fontStyle: element.type === 'text' && element.italic ? 'italic' : undefined,
                     textAlign: element.type === 'text' ? element.textAlign || 'left' : undefined,
                     justifyContent: element.type === 'text' ? (element.textAlign === 'center' ? 'center' : element.textAlign === 'right' ? 'flex-end' : 'flex-start') : undefined,
                     opacity: element.opacity ?? 1,
-                    borderRadius: element.type === 'shape' && element.shapeKind === 'ellipse' ? '50%' : (element.borderRadius ?? (element.type === 'shape' ? 18 : element.type === 'image' ? 4 : 0)) + 'px',
-                    border: element.strokeColor && (element.strokeWidth ?? 0) > 0 ? (element.strokeWidth + 'px solid ' + element.strokeColor) : undefined,
-                    boxShadow: (element.shadow ?? 0) > 0 ? '0 ' + (element.shadow ?? 0) * 0.35 + 'px ' + (element.shadow ?? 0) * 2 + 'px ' + (element.shadowColor || 'rgba(0,0,0,.30)') : undefined,
+                    borderRadius: element.type === 'shape' && element.shapeKind === 'ellipse' ? '50%' : ((element.borderRadius ?? (element.type === 'shape' ? 18 : element.type === 'image' ? 4 : 0)) * zoom / 100) + 'px',
+                    border: element.strokeColor && (element.strokeWidth ?? 0) > 0 ? ((element.strokeWidth * zoom / 100) + 'px solid ' + element.strokeColor) : undefined,
+                    boxShadow: (element.shadow ?? 0) > 0 ? '0 ' + ((element.shadow ?? 0) * 0.35 * zoom / 100) + 'px ' + ((element.shadow ?? 0) * 2 * zoom / 100) + 'px ' + (element.shadowColor || 'rgba(0,0,0,.30)') : undefined,
                   }}
                   onPointerDown={(event) => { if (lockedLayers.has(element.id) || hiddenLayers.has(element.id)) { event.stopPropagation(); setSelectedId(element.id); return; } handlePointerDown(event, element); }}
                 >
                   {element.type === 'text' && <span>{element.text}</span>}
-                  {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} style={{ objectFit: element.fit ?? "cover", objectPosition: (element.cropX ?? 50) + "% " + (element.cropY ?? 50) + "%", borderRadius: (element.borderRadius ?? 4) + "px", filter: "brightness(" + (element.brightness ?? 100) + "%) contrast(" + (element.contrast ?? 100) + "%) saturate(" + (element.saturation ?? 100) + "%) grayscale(" + (element.grayscale ?? 0) + "%) blur(" + (element.blur ?? 0) + "px)" }} />}
-                  {element.type === 'video' && element.src && <video src={element.src} muted playsInline preload="metadata" draggable={false} style={{ objectFit: element.fit ?? "cover", objectPosition: (element.cropX ?? 50) + "% " + (element.cropY ?? 50) + "%", borderRadius: (element.borderRadius ?? 4) + "px", filter: "brightness(" + (element.brightness ?? 100) + "%) contrast(" + (element.contrast ?? 100) + "%) saturate(" + (element.saturation ?? 100) + "%) grayscale(" + (element.grayscale ?? 0) + "%) blur(" + (element.blur ?? 0) + "px)" }} />}
+                  {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} style={{ objectFit: element.fit ?? "cover", objectPosition: (element.cropX ?? 50) + "% " + (element.cropY ?? 50) + "%", borderRadius: ((element.borderRadius ?? 4) * zoom / 100) + "px", filter: "brightness(" + (element.brightness ?? 100) + "%) contrast(" + (element.contrast ?? 100) + "%) saturate(" + (element.saturation ?? 100) + "%) grayscale(" + (element.grayscale ?? 0) + "%) blur(" + ((element.blur ?? 0) * zoom / 100) + "px)" }} />}
+                  {element.type === 'video' && element.src && <video src={element.src} muted playsInline preload="metadata" draggable={false} style={{ objectFit: element.fit ?? "cover", objectPosition: (element.cropX ?? 50) + "% " + (element.cropY ?? 50) + "%", borderRadius: ((element.borderRadius ?? 4) * zoom / 100) + "px", filter: "brightness(" + (element.brightness ?? 100) + "%) contrast(" + (element.contrast ?? 100) + "%) saturate(" + (element.saturation ?? 100) + "%) grayscale(" + (element.grayscale ?? 0) + "%) blur(" + ((element.blur ?? 0) * zoom / 100) + "px)" }} />}
                   {selectedId === element.id && <span className="editor-selection-label">{element.type.toUpperCase()}</span>}
                   {selectedId === element.id && tool === "select" && !lockedLayers.has(element.id) && ["nw", "n", "ne", "e", "se", "s", "sw", "w"].map((handle) => <button type="button" key={handle} className={"editor-transform-handle handle-" + handle} aria-label={"Resize " + element.type + " " + handle} onPointerDown={(event) => startResize(event, element, handle)} />)}
                 </div>
