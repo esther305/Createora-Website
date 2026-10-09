@@ -1868,15 +1868,43 @@ function CreateoraEditor() {
                   </div>
                   {selectedMedia && (
                     <div className="inspector-section editor-transform-tools">
-                      <div className="inspector-section-title"><span>Transform</span><small>{selectedMedia.type.toUpperCase()}</small></div>
+                      <div className="inspector-section-title"><span>Image frame</span><small>{selectedMedia.type.toUpperCase()}</small></div>
                       <div className="transform-tool-grid">
-                        <button className={cropMode ? 'active' : ''} onClick={() => setCropMode((mode) => !mode)}><Square size={13} /> {cropMode ? 'Exit crop' : 'Crop'}</button>
+                        <button className={(selectedMedia.fit ?? 'cover') === 'cover' ? 'active' : ''} onClick={() => updateSelected({ fit: 'cover' })}>Fill frame</button>
+                        <button className={selectedMedia.fit === 'contain' ? 'active' : ''} onClick={() => updateSelected({ fit: 'contain' })}>Fit image</button>
+                        <button onClick={() => updateSelected({ flipX: !selectedMedia.flipX })}>Flip H</button>
+                        <button onClick={() => updateSelected({ flipY: !selectedMedia.flipY })}>Flip V</button>
+                        <button onClick={() => updateSelected({ rotation: 0, flipX: false, flipY: false })}>Reset</button>
                         <button className={snapEnabled ? 'active' : ''} onClick={() => setSnapEnabled((enabled) => !enabled)}><Target size={13} /> Snap</button>
-                        <button className={showGuides ? 'active' : ''} onClick={() => setShowGuides((visible) => !visible)}><Grid2X2 size={13} /> Guides</button>
                       </div>
-                      {cropMode && <div className="crop-helper"><strong>Crop mode active</strong><span>Use the canvas handles to frame the media.</span></div>}
                     </div>
                   )}
+
+                  {(selected.type === 'image' || selected.type === 'video') && <div className="inspector-section">
+                    <label>Image adjustments</label>
+                    <div className="inspector-control-stack">
+                      <label>Brightness · {selected.brightness ?? 100}%<input type="range" min="0" max="200" step="1" value={selected.brightness ?? 100} onChange={(event) => updateSelected({ brightness: Number(event.target.value) })} /></label>
+                      <label>Contrast · {selected.contrast ?? 100}%<input type="range" min="0" max="200" step="1" value={selected.contrast ?? 100} onChange={(event) => updateSelected({ contrast: Number(event.target.value) })} /></label>
+                      <label>Saturation · {selected.saturation ?? 100}%<input type="range" min="0" max="200" step="1" value={selected.saturation ?? 100} onChange={(event) => updateSelected({ saturation: Number(event.target.value) })} /></label>
+                      <label>Grayscale · {selected.grayscale ?? 0}%<input type="range" min="0" max="100" step="1" value={selected.grayscale ?? 0} onChange={(event) => updateSelected({ grayscale: Number(event.target.value) })} /></label>
+                      <label>Blur · {selected.blur ?? 0}px<input type="range" min="0" max="12" step="0.5" value={selected.blur ?? 0} onChange={(event) => updateSelected({ blur: Number(event.target.value) })} /></label>
+                      <button className="inspector-reset-button" onClick={() => updateSelected({ brightness: 100, contrast: 100, saturation: 100, grayscale: 0, blur: 0 })}>Reset image adjustments</button>
+                    </div>
+                  </div>}
+
+                  {selected.type === 'shape' && <div className="inspector-section">
+                    <label>Shape style</label>
+                    <div className="inspector-control-stack">
+                      <label>Corner radius · {selected.borderRadius ?? 18}px<input type="range" min="0" max="120" value={selected.borderRadius ?? 18} onChange={(event) => updateSelected({ borderRadius: Number(event.target.value) })} /></label>
+                      <label>Outline color<input type="color" className="inspector-color-input" value={selected.strokeColor || '#2f9e64'} onChange={(event) => updateSelected({ strokeColor: event.target.value, strokeWidth: selected.strokeWidth ?? 2 })} /></label>
+                      <label>Outline width · {selected.strokeWidth ?? 0}px<input type="range" min="0" max="20" value={selected.strokeWidth ?? 0} onChange={(event) => updateSelected({ strokeWidth: Number(event.target.value) })} /></label>
+                    </div>
+                  </div>}
+
+                  <div className="inspector-section">
+                    <label>Opacity · {Math.round((selected.opacity ?? 1) * 100)}%</label>
+                    <div className="inspector-slider"><input aria-label="Layer opacity" type="range" min="0" max="1" step="0.01" value={selected.opacity ?? 1} onChange={(event) => updateSelected({ opacity: Number(event.target.value) })} /></div>
+                  </div>
 
                   {selected.type === 'video' && (
                     <>
@@ -1910,7 +1938,15 @@ function CreateoraEditor() {
                   <button className="inspector-delete" onClick={removeSelected}><Trash2 size={15} /> Delete layer</button>
                 </>
               ) : (
-                <div className="inspector-empty"><Sparkles size={18} /><strong>Nothing selected</strong><span>Select an element to edit its properties.</span></div>
+                <div className="inspector-canvas-settings">
+                  <div className="inspector-section"><label>Canvas size</label><select aria-label="Canvas size preset" value={canvasWidth + 'x' + canvasHeight} onChange={(event) => { const preset = canvasPresets.find((item) => item.width + 'x' + item.height === event.target.value); if (preset) applyCanvasPreset(preset.width, preset.height); }}>
+                    {!canvasPresets.some((item) => item.width === canvasWidth && item.height === canvasHeight) && <option value={canvasWidth + 'x' + canvasHeight}>Custom · {canvasWidth} × {canvasHeight}</option>}
+                    {canvasPresets.map((preset) => <option key={preset.label} value={preset.width + 'x' + preset.height}>{preset.label}</option>)}
+                  </select></div>
+                  <div className="inspector-section"><label>Background color</label><div className="color-row"><input className="inspector-color-input" type="color" aria-label="Canvas background color" value={canvasBackground} onChange={(event) => setCanvasBackground(event.target.value)} /><span>{canvasBackground.toUpperCase()}</span></div></div>
+                  <div className="inspector-section"><label>Quick tips</label><div className="inspector-note">Drag the corner and edge handles to resize. Use arrow keys to nudge by 1px, or Shift + arrows for 10px.</div><div className="inspector-note">Ctrl/Cmd + Z undo · Ctrl/Cmd + Shift + Z redo · Ctrl/Cmd + D duplicate · Delete remove</div></div>
+                  <div className="inspector-section"><button className="inspector-reset-button" onClick={() => void exportImage('png')}><Download size={14} /> Export high-resolution PNG</button></div>
+                </div>
               )}
             </>
           )}
