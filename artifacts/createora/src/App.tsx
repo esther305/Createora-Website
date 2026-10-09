@@ -950,6 +950,7 @@ function CreateoraEditor() {
   const [future, setFuture] = useState<EditorElement[][]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
+  const textEditSnapshotRef = useRef<EditorElement[] | null>(null);
   const dragRef = useRef<{
     id: string; mode: 'move' | 'resize'; offsetX: number; offsetY: number; startElements?: EditorElement[];
     handle?: string; startClientX?: number; startClientY?: number;
@@ -1866,7 +1867,7 @@ function CreateoraEditor() {
                 <>
                   <div className="inspector-section">
                     <label>{selected.type === 'text' ? 'Text content' : selected.type === 'shape' ? 'Shape fill' : 'Layer'}</label>
-                    {selected.type === 'text' && <textarea id="selected-text-content" name="selected-text-content" value={selected.text ?? ''} onChange={(event) => setElements((current) => current.map((item) => item.id === selected.id ? { ...item, text: event.target.value } : item))} />}
+                    {selected.type === 'text' && <textarea id="selected-text-content" name="selected-text-content" value={selected.text ?? ''} onFocus={() => { if (!textEditSnapshotRef.current) textEditSnapshotRef.current = elements; }} onBlur={() => { const snapshot = textEditSnapshotRef.current; if (snapshot) { setHistory((current) => [...current.slice(-19), snapshot]); setFuture([]); textEditSnapshotRef.current = null; } }} onChange={(event) => setElements((current) => current.map((item) => item.id === selected.id ? { ...item, text: event.target.value } : item))} />}
                     {selected.type === 'shape' && <div className="color-row"><input className="inspector-color-input" aria-label="Shape fill color" type="color" value={selected.color || '#2f9e64'} onChange={(event) => updateSelected({ color: event.target.value })} /><span>{selected.color || '#2f9e64'}</span></div>}
                     {(selected.type === 'image' || selected.type === 'video') && <div className="inspector-note">Adjust the image frame, colors, and transparency below.</div>}
                   </div>
@@ -1884,10 +1885,10 @@ function CreateoraEditor() {
                   <div className="inspector-section">
                     <label>Position</label>
                     <div className="inspector-grid">
-                      <label>X<input id="element-x" name="element-x" type="number" value={Math.round(selected.x)} onChange={(e) => updateSelected({ x: Number(e.target.value) })} /></label>
-                      <label>Y<input id="element-y" name="element-y" type="number" value={Math.round(selected.y)} onChange={(e) => updateSelected({ y: Number(e.target.value) })} /></label>
-                      <label>W<input id="element-width" name="element-width" type="number" value={Math.round(selected.width)} onChange={(e) => updateSelected({ width: Number(e.target.value) })} /></label>
-                      <label>H<input id="element-height" name="element-height" type="number" value={Math.round(selected.height)} onChange={(e) => updateSelected({ height: Number(e.target.value) })} /></label>
+                      <label>X<input id="element-x" name="element-x" type="number" min="0" max={Math.max(0, canvasWidth - selected.width)} value={Math.round(selected.x)} onChange={(e) => updateSelected({ x: Math.max(0, Math.min(Math.max(0, canvasWidth - selected.width), Number(e.target.value) || 0)) })} /></label>
+                      <label>Y<input id="element-y" name="element-y" type="number" min="0" max={Math.max(0, canvasHeight - selected.height)} value={Math.round(selected.y)} onChange={(e) => updateSelected({ y: Math.max(0, Math.min(Math.max(0, canvasHeight - selected.height), Number(e.target.value) || 0)) })} /></label>
+                      <label>W<input id="element-width" name="element-width" type="number" min="24" max={canvasWidth} value={Math.round(selected.width)} onChange={(e) => updateSelected({ width: Math.max(24, Math.min(canvasWidth, Number(e.target.value) || 24)) })} /></label>
+                      <label>H<input id="element-height" name="element-height" type="number" min="24" max={canvasHeight} value={Math.round(selected.height)} onChange={(e) => updateSelected({ height: Math.max(24, Math.min(canvasHeight, Number(e.target.value) || 24)) })} /></label>
                     </div>
                   </div>
                   {selectedMedia && (
@@ -1900,6 +1901,8 @@ function CreateoraEditor() {
                         <button onClick={() => updateSelected({ flipY: !selectedMedia.flipY })}>Flip V</button>
                         <button onClick={() => updateSelected({ rotation: 0, flipX: false, flipY: false })}>Reset</button>
                         <button className={snapEnabled ? 'active' : ''} onClick={() => setSnapEnabled((enabled) => !enabled)}><Target size={13} /> Snap</button>
+                        <button onClick={() => updateSelected({ x: Math.max(0, Math.round((canvasWidth - selectedMedia.width) / 2)) })}>Center H</button>
+                        <button onClick={() => updateSelected({ y: Math.max(0, Math.round((canvasHeight - selectedMedia.height) / 2)) })}>Center V</button>
                       </div>
                     </div>
                   )}
@@ -1907,6 +1910,7 @@ function CreateoraEditor() {
                   {(selected.type === 'image' || selected.type === 'video') && <div className="inspector-section">
                     <label>Image adjustments</label>
                     <div className="inspector-control-stack">
+                      <div className="image-filter-presets"><button onClick={() => updateSelected({ brightness: 100, contrast: 100, saturation: 100, grayscale: 0, blur: 0 })}>Original</button><button onClick={() => updateSelected({ brightness: 100, contrast: 110, saturation: 0, grayscale: 100, blur: 0 })}>B&amp;W</button><button onClick={() => updateSelected({ brightness: 105, contrast: 102, saturation: 125, grayscale: 0, blur: 0 })}>Warm</button><button onClick={() => updateSelected({ brightness: 100, contrast: 135, saturation: 115, grayscale: 0, blur: 0 })}>Drama</button></div>
                       <label>Brightness · {selected.brightness ?? 100}%<input type="range" min="0" max="200" step="1" value={selected.brightness ?? 100} onChange={(event) => updateSelected({ brightness: Number(event.target.value) })} /></label>
                       <label>Contrast · {selected.contrast ?? 100}%<input type="range" min="0" max="200" step="1" value={selected.contrast ?? 100} onChange={(event) => updateSelected({ contrast: Number(event.target.value) })} /></label>
                       <label>Saturation · {selected.saturation ?? 100}%<input type="range" min="0" max="200" step="1" value={selected.saturation ?? 100} onChange={(event) => updateSelected({ saturation: Number(event.target.value) })} /></label>
