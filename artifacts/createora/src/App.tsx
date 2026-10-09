@@ -1407,7 +1407,7 @@ function CreateoraEditor() {
         <section className="editor-stage">
           <div className="editor-stage-head">
             <div><span>DESIGN</span><strong>1080 × 1080</strong><button className="mobile-inspector-toggle" onClick={() => setMobileInspectorOpen((open) => !open)} aria-expanded={mobileInspectorOpen}>{mobileInspectorOpen ? 'Hide properties' : 'Properties'}</button></div>
-            <div className="editor-zoom"><button onClick={() => setZoom(Math.max(40, zoom - 10))}>−</button><span>{zoom}%</span><button onClick={() => setZoom(Math.min(120, zoom + 10))}><ZoomIn size={14} /></button></div>
+            <div className="editor-zoom"><button onClick={() => setZoom(Math.max(25, zoom - 10))} aria-label="Zoom out">−</button><span>{zoom}%</span><button onClick={() => setZoom(Math.min(120, zoom + 10))} aria-label="Zoom in"><ZoomIn size={14} /></button><button className="editor-zoom-fit" onClick={() => setZoom(30)} title="Fit canvas to phone">Fit</button></div>
           </div>
           <div className="editor-canvas-wrap">
             <div
@@ -1459,6 +1459,13 @@ function CreateoraEditor() {
               <Video size={12} /> {timelineOpen ? 'Hide timeline' : 'Show timeline'}
             </button>
           </footer>
+          <div className="editor-mobile-actions" aria-label="Mobile editing tools">
+            <button onClick={() => addText()}><Type size={17} /><span>Text</span></button>
+            <button onClick={() => addShape()}><Square size={16} /><span>Shape</span></button>
+            <button onClick={() => fileRef.current?.click()}><Upload size={17} /><span>Upload</span></button>
+            <button className={layersOpen ? 'active' : ''} onClick={() => setLayersOpen((open) => !open)}><Grid2X2 size={16} /><span>Layers</span></button>
+            <button className={mobileInspectorOpen ? 'active' : ''} onClick={() => setMobileInspectorOpen((open) => !open)} aria-expanded={mobileInspectorOpen}><Settings size={16} /><span>Properties</span></button>
+          </div>
           {timelineOpen && (
             <section className="editor-timeline" aria-label="Video timeline">
               <div className="timeline-toolbar">
