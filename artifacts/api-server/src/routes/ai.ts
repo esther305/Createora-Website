@@ -29,7 +29,7 @@ const generateWithGemini = async (
   model: string,
 ) => {
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: "POST",
       headers: {
@@ -243,7 +243,7 @@ router.post("/ai/images/generate", async (req, res) => {
 
   const geminiModel =
     process.env.CREATEORA_IMAGE_MODEL ||
-    "gemini-nano-banana-2.1";
+    "gemini-2.5-flash-image";
 
   const hfModel =
     process.env.HF_IMAGE_MODEL ||
