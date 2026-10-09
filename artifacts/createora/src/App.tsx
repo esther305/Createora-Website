@@ -1125,7 +1125,7 @@ function CreateoraEditor() {
         event.preventDefault();
         const selectedElement = elements.find((entry) => entry.id === selectedId);
         if (!selectedElement) return;
-        const copy = { ...selectedElement, id: crypto.randomUUID(), x: Math.max(0, Math.min(canvasWidth - selectedElement.width, selectedElement.x + 24)), y: Math.max(0, Math.min(canvasHeight - selectedElement.height, selectedElement.y + 24)) };
+        const copy = { ...selectedElement, id: crypto.randomUUID(), x: Math.max(0, Math.min(Math.max(0, canvasWidth - selectedElement.width), selectedElement.x + 24)), y: Math.max(0, Math.min(Math.max(0, canvasHeight - selectedElement.height), selectedElement.y + 24)) };
         setHistory((current) => [...current.slice(-19), elements]); setFuture([]); setElements([...elements, copy]); setSelectedId(copy.id); return;
       }
       if (event.key === 'Escape') { setSelectedId(null); setMobileInspectorOpen(false); setExportMenuOpen(false); return; }
@@ -1698,7 +1698,7 @@ function CreateoraEditor() {
               onPointerDown={() => setSelectedId(null)}
               onPointerMove={handlePointerMove}
               onPointerUp={finishDrag}
-              onPointerLeave={finishDrag}
+              onPointerCancel={finishDrag}
             >
               <div className="editor-canvas-grid" />
               <div className="editor-ruler editor-ruler-horizontal" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <span key={index}>{Math.round((canvasWidth / 4) * index)}</span>)}</div>
@@ -1725,15 +1725,14 @@ function CreateoraEditor() {
                     opacity: element.opacity ?? 1,
                     borderRadius: (element.borderRadius ?? (element.type === 'shape' ? 18 : element.type === 'image' ? 4 : 0)) + 'px',
                     border: element.strokeColor && (element.strokeWidth ?? 0) > 0 ? (element.strokeWidth + 'px solid ' + element.strokeColor) : undefined,
-                    filter: element.type === 'image' || element.type === 'video' ? 'brightness(' + (element.brightness ?? 100) + '%) contrast(' + (element.contrast ?? 100) + '%) saturate(' + (element.saturation ?? 100) + '%) grayscale(' + (element.grayscale ?? 0) + '%) blur(' + (element.blur ?? 0) + 'px)' : undefined,
                   }}
                   onPointerDown={(event) => { if (lockedLayers.has(element.id) || hiddenLayers.has(element.id)) { event.stopPropagation(); setSelectedId(element.id); return; } handlePointerDown(event, element); }}
                 >
                   {element.type === 'text' && <span>{element.text}</span>}
-                  {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} style={{ objectFit: element.fit ?? "cover" }} />}
-                  {element.type === 'video' && element.src && <video src={element.src} muted playsInline preload="metadata" draggable={false} style={{ objectFit: element.fit ?? "cover" }} />}
+                  {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} style={{ objectFit: element.fit ?? "cover", borderRadius: (element.borderRadius ?? 4) + "px", filter: "brightness(" + (element.brightness ?? 100) + "%) contrast(" + (element.contrast ?? 100) + "%) saturate(" + (element.saturation ?? 100) + "%) grayscale(" + (element.grayscale ?? 0) + "%) blur(" + (element.blur ?? 0) + "px)" }} />}
+                  {element.type === 'video' && element.src && <video src={element.src} muted playsInline preload="metadata" draggable={false} style={{ objectFit: element.fit ?? "cover", borderRadius: (element.borderRadius ?? 4) + "px", filter: "brightness(" + (element.brightness ?? 100) + "%) contrast(" + (element.contrast ?? 100) + "%) saturate(" + (element.saturation ?? 100) + "%) grayscale(" + (element.grayscale ?? 0) + "%) blur(" + (element.blur ?? 0) + "px)" }} />}
                   {selectedId === element.id && <span className="editor-selection-label">{element.type.toUpperCase()}</span>}
-                  {selectedId === element.id && tool === "select" && ["nw", "n", "ne", "e", "se", "s", "sw", "w"].map((handle) => <button type="button" key={handle} className={"editor-transform-handle handle-" + handle} aria-label={"Resize " + element.type + " " + handle} onPointerDown={(event) => startResize(event, element, handle)} />)}
+                  {selectedId === element.id && tool === "select" && !lockedLayers.has(element.id) && ["nw", "n", "ne", "e", "se", "s", "sw", "w"].map((handle) => <button type="button" key={handle} className={"editor-transform-handle handle-" + handle} aria-label={"Resize " + element.type + " " + handle} onPointerDown={(event) => startResize(event, element, handle)} />)}
                 </div>
               ))}
               {!elements.length && (
