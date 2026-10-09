@@ -1379,8 +1379,18 @@ function CreateoraEditor() {
 
       const segmenter = await transformers.pipeline('background-removal', 'Xenova/modnet');
       const result = await segmenter(selected.src);
-      const cutoutCanvas = result[0]?.toCanvas();
-      if (!cutoutCanvas) throw new Error('The background model returned no image.');
+      const modelOutput = result[0]?.toCanvas();
+      if (!modelOutput) throw new Error('The background model returned no image.');
+
+      // Transformers.js may return an OffscreenCanvas-like surface that has
+      // convertToBlob() instead of HTMLCanvasElement.toBlob(). Draw it onto a
+      // normal browser canvas before exporting so both canvas types work.
+      const cutoutCanvas = document.createElement('canvas');
+      cutoutCanvas.width = modelOutput.width;
+      cutoutCanvas.height = modelOutput.height;
+      const cutoutContext = cutoutCanvas.getContext('2d');
+      if (!cutoutContext) throw new Error('Your browser could not prepare the transparent image.');
+      cutoutContext.drawImage(modelOutput as CanvasImageSource, 0, 0);
 
       const resultBlob = await new Promise<Blob>((resolve, reject) => {
         cutoutCanvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Could not export the transparent image.')), 'image/png');
