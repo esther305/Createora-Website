@@ -1841,10 +1841,22 @@ function CreateoraEditor() {
               {selected ? (
                 <>
                   <div className="inspector-section">
-                    <label>Content</label>
+                    <label>{selected.type === 'text' ? 'Text content' : selected.type === 'shape' ? 'Shape fill' : 'Layer'}</label>
                     {selected.type === 'text' && <textarea id="selected-text-content" name="selected-text-content" value={selected.text ?? ''} onChange={(event) => setElements((current) => current.map((item) => item.id === selected.id ? { ...item, text: event.target.value } : item))} />}
-                    {selected.type === 'shape' && <div className="color-row"><button className="color-swatch" style={{ background: selected.color }} /><span>{selected.color}</span></div>}
+                    {selected.type === 'shape' && <div className="color-row"><input className="inspector-color-input" aria-label="Shape fill color" type="color" value={selected.color || '#2f9e64'} onChange={(event) => updateSelected({ color: event.target.value })} /><span>{selected.color || '#2f9e64'}</span></div>}
+                    {(selected.type === 'image' || selected.type === 'video') && <div className="inspector-note">Adjust the image frame, colors, and transparency below.</div>}
                   </div>
+                  {selected.type === 'text' && <div className="inspector-section">
+                    <label>Typography</label>
+                    <div className="inspector-control-stack">
+                      <label>Font family<select value={selected.fontFamily || 'DM Sans'} onChange={(event) => updateSelected({ fontFamily: event.target.value })}><option>DM Sans</option><option>Arial</option><option>Georgia</option><option>Impact</option><option>Courier New</option><option>Times New Roman</option></select></label>
+                      <label>Font size · {selected.fontSize ?? 45}px<input type="range" min="12" max="160" step="1" value={selected.fontSize ?? 45} onChange={(event) => updateSelected({ fontSize: Number(event.target.value) })} /></label>
+                      <label>Weight<select value={String(selected.fontWeight ?? 800)} onChange={(event) => updateSelected({ fontWeight: Number(event.target.value) })}><option value="400">Regular</option><option value="500">Medium</option><option value="600">Semibold</option><option value="700">Bold</option><option value="800">Extra bold</option></select></label>
+                      <label>Text color<input className="inspector-color-input" aria-label="Text color" type="color" value={selected.color || '#151915'} onChange={(event) => updateSelected({ color: event.target.value })} /></label>
+                      <label className="inspector-check"><input type="checkbox" checked={Boolean(selected.italic)} onChange={(event) => updateSelected({ italic: event.target.checked })} /> Italic</label>
+                      <div className="inspector-align-row"><span>Alignment</span>{(['left','center','right'] as const).map((align) => <button key={align} className={(selected.textAlign || 'left') === align ? 'active' : ''} onClick={() => updateSelected({ textAlign: align })}>{align[0].toUpperCase() + align.slice(1)}</button>)}</div>
+                    </div>
+                  </div>}
                   <div className="inspector-section">
                     <label>Position</label>
                     <div className="inspector-grid">
