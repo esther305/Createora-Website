@@ -1326,35 +1326,64 @@ function CreateoraEditor() {
     const rect = (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect();
     if (!rect) return;
     dragRef.current = {
-      id: element.id,
+      id: element.id, mode: 'move',
       offsetX: event.clientX - rect.left - element.x * (zoom / 100),
       offsetY: event.clientY - rect.top - element.y * (zoom / 100),
     };
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   };
 
+  const startResize = (event: PointerEvent, element: EditorElement, handle: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedId(element.id);
+    dragRef.current = {
+      id: element.id, mode: 'resize', handle, offsetX: 0, offsetY: 0,
+      startClientX: event.clientX, startClientY: event.clientY,
+      startX: element.x, startY: element.y, startWidth: element.width, startHeight: element.height,
+    };
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  };
+
   const handlePointerMove = (event: React.PointerEvent) => {
-    if (!dragRef.current) return;
+    const drag = dragRef.current;
+    if (!drag) return;
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const scale = zoom / 100;
-    const moving = elements.find((item) => item.id === dragRef.current?.id);
+    const moving = elements.find((item) => item.id === drag.id);
     if (!moving) return;
-    let x = Math.max(0, Math.min(900 - moving.width, (event.clientX - rect.left - dragRef.current.offsetX) / scale));
-    let y = Math.max(0, Math.min(600 - moving.height, (event.clientY - rect.top - dragRef.current.offsetY) / scale));
+
+    if (drag.mode === 'resize') {
+      const dx = (event.clientX - (drag.startClientX ?? event.clientX)) / scale;
+      const dy = (event.clientY - (drag.startClientY ?? event.clientY)) / scale;
+      const minSize = 24;
+      const startX = drag.startX ?? moving.x, startY = drag.startY ?? moving.y;
+      const startWidth = drag.startWidth ?? moving.width, startHeight = drag.startHeight ?? moving.height;
+      let x = startX, y = startY, width = startWidth, height = startHeight;
+      if (drag.handle?.includes('w')) { x = Math.max(0, Math.min(startX + startWidth - minSize, startX + dx)); width = startX + startWidth - x; }
+      if (drag.handle?.includes('e')) width = Math.max(minSize, Math.min(canvasWidth - startX, startWidth + dx));
+      if (drag.handle?.includes('n')) { y = Math.max(0, Math.min(startY + startHeight - minSize, startY + dy)); height = startY + startHeight - y; }
+      if (drag.handle?.includes('s')) height = Math.max(minSize, Math.min(canvasHeight - startY, startHeight + dy));
+      setElements((current) => current.map((item) => item.id === drag.id ? { ...item, x, y, width, height } : item));
+      return;
+    }
+
+    let x = Math.max(0, Math.min(Math.max(0, canvasWidth - moving.width), (event.clientX - rect.left - drag.offsetX) / scale));
+    let y = Math.max(0, Math.min(Math.max(0, canvasHeight - moving.height), (event.clientY - rect.top - drag.offsetY) / scale));
     const guides: { x?: number; y?: number } = {};
     if (snapEnabled) {
       const threshold = 10;
-      const centerX = (900 - moving.width) / 2;
-      const centerY = (600 - moving.height) / 2;
-      if (Math.abs(x - centerX) <= threshold) { x = centerX; guides.x = 450; }
+      const centerX = (canvasWidth - moving.width) / 2;
+      const centerY = (canvasHeight - moving.height) / 2;
+      if (Math.abs(x - centerX) <= threshold) { x = centerX; guides.x = canvasWidth / 2; }
       else if (Math.abs(x) <= threshold) { x = 0; guides.x = 0; }
-      else if (Math.abs(x + moving.width - 900) <= threshold) { x = 900 - moving.width; guides.x = 900; }
-      if (Math.abs(y - centerY) <= threshold) { y = centerY; guides.y = 300; }
+      else if (Math.abs(x + moving.width - canvasWidth) <= threshold) { x = Math.max(0, canvasWidth - moving.width); guides.x = canvasWidth; }
+      if (Math.abs(y - centerY) <= threshold) { y = centerY; guides.y = canvasHeight / 2; }
       else if (Math.abs(y) <= threshold) { y = 0; guides.y = 0; }
-      else if (Math.abs(y + moving.height - 600) <= threshold) { y = 600 - moving.height; guides.y = 600; }
+      else if (Math.abs(y + moving.height - canvasHeight) <= threshold) { y = Math.max(0, canvasHeight - moving.height); guides.y = canvasHeight; }
     }
     setSnapGuides(showGuides ? guides : {});
-    setElements((current) => current.map((item) => item.id === dragRef.current?.id ? { ...item, x, y } : item));
+    setElements((current) => current.map((item) => item.id === drag.id ? { ...item, x, y } : item));
   };
 
   const finishDrag = () => {
