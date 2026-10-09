@@ -951,7 +951,7 @@ function CreateoraEditor() {
   const fileRef = useRef<HTMLInputElement>(null);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
-    id: string; mode: 'move' | 'resize'; offsetX: number; offsetY: number;
+    id: string; mode: 'move' | 'resize'; offsetX: number; offsetY: number; startElements?: EditorElement[];
     handle?: string; startClientX?: number; startClientY?: number;
     startX?: number; startY?: number; startWidth?: number; startHeight?: number;
   } | null>(null);
@@ -1091,6 +1091,61 @@ function CreateoraEditor() {
   }, [elements, projectName, projectId, projectReady, canvasWidth, canvasHeight, canvasBackground]);
 
 
+
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const editingText = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable || target.tagName === 'SELECT');
+      if (editingText) {
+        if (event.key === 'Escape') { setSelectedId(null); setMobileInspectorOpen(false); }
+        return;
+      }
+      const mod = event.ctrlKey || event.metaKey;
+      if (mod && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) {
+          if (!future.length) return;
+          setHistory((current) => [...current, elements].slice(-20));
+          setElements(future[0]); setFuture((current) => current.slice(1));
+        } else {
+          if (!history.length) return;
+          setFuture((current) => [elements, ...current].slice(0, 20));
+          setElements(history[history.length - 1]); setHistory((current) => current.slice(0, -1));
+        }
+        setSelectedId(null); return;
+      }
+      if (mod && event.key.toLowerCase() === 'y') {
+        event.preventDefault();
+        if (!future.length) return;
+        setHistory((current) => [...current, elements].slice(-20));
+        setElements(future[0]); setFuture((current) => current.slice(1)); setSelectedId(null); return;
+      }
+      if (mod && event.key.toLowerCase() === 'd') {
+        event.preventDefault();
+        const selectedElement = elements.find((entry) => entry.id === selectedId);
+        if (!selectedElement) return;
+        const copy = { ...selectedElement, id: crypto.randomUUID(), x: Math.max(0, Math.min(canvasWidth - selectedElement.width, selectedElement.x + 24)), y: Math.max(0, Math.min(canvasHeight - selectedElement.height, selectedElement.y + 24)) };
+        setHistory((current) => [...current.slice(-19), elements]); setFuture([]); setElements([...elements, copy]); setSelectedId(copy.id); return;
+      }
+      if (event.key === 'Escape') { setSelectedId(null); setMobileInspectorOpen(false); setExportMenuOpen(false); return; }
+      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedId) {
+        event.preventDefault();
+        setHistory((current) => [...current.slice(-19), elements]); setFuture([]);
+        setElements(elements.filter((entry) => entry.id !== selectedId)); setSelectedId(null); return;
+      }
+      if (selectedId && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+        event.preventDefault();
+        const step = event.shiftKey ? 10 : 1;
+        const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
+        const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
+        setHistory((current) => [...current.slice(-19), elements]); setFuture([]);
+        setElements(elements.map((entry) => entry.id === selectedId ? { ...entry, x: Math.max(0, Math.min(canvasWidth - entry.width, entry.x + dx)), y: Math.max(0, Math.min(canvasHeight - entry.height, entry.y + dy)) } : entry));
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [selectedId, elements, history, future, canvasWidth, canvasHeight]);
 
   const generateAIImage = async () => {
     if (!aiPrompt.trim() || aiLoading) return;
@@ -1475,37 +1530,7 @@ function CreateoraEditor() {
     }
   };
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const editingText = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable || target.tagName === 'SELECT');
-      if (editingText) {
-        if (event.key === 'Escape') { setSelectedId(null); setMobileInspectorOpen(false); }
-        return;
-      }
-      const mod = event.ctrlKey || event.metaKey;
-      if (mod && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo(); return; }
-      if (mod && event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); return; }
-      if (mod && event.key.toLowerCase() === 'd') { event.preventDefault(); duplicateSelected(); return; }
-      if (event.key === 'Escape') { setSelectedId(null); setMobileInspectorOpen(false); setExportMenuOpen(false); return; }
-      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedId) { event.preventDefault(); removeSelected(); return; }
-      if (selectedId && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
-        event.preventDefault();
-        const step = event.shiftKey ? 10 : 1;
-        const item = elements.find((entry) => entry.id === selectedId);
-        if (!item) return;
-        const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
-        const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
-        commit(elements.map((entry) => entry.id === selectedId ? {
-          ...entry,
-          x: Math.max(0, Math.min(canvasWidth - entry.width, entry.x + dx)),
-          y: Math.max(0, Math.min(canvasHeight - entry.height, entry.y + dy)),
-        } : entry));
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [selectedId, elements, history, future, canvasWidth, canvasHeight]);
+
 
   const handlePointerDown = (event: PointerEvent, element: EditorElement) => {
     if (tool !== 'select') return;
@@ -1514,7 +1539,7 @@ function CreateoraEditor() {
     const rect = (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect();
     if (!rect) return;
     dragRef.current = {
-      id: element.id, mode: 'move',
+      id: element.id, mode: 'move', startElements: elements,
       offsetX: event.clientX - rect.left - element.x * (zoom / 100),
       offsetY: event.clientY - rect.top - element.y * (zoom / 100),
     };
@@ -1526,7 +1551,7 @@ function CreateoraEditor() {
     event.stopPropagation();
     setSelectedId(element.id);
     dragRef.current = {
-      id: element.id, mode: 'resize', handle, offsetX: 0, offsetY: 0,
+      id: element.id, mode: 'resize', handle, offsetX: 0, offsetY: 0, startElements: elements,
       startClientX: event.clientX, startClientY: event.clientY,
       startX: element.x, startY: element.y, startWidth: element.width, startHeight: element.height,
     };
@@ -1575,9 +1600,9 @@ function CreateoraEditor() {
   };
 
   const finishDrag = () => {
-    if (!dragRef.current) return;
-    const current = elements;
-    setHistory((h) => [...h.slice(-19), current]);
+    const drag = dragRef.current;
+    if (!drag) return;
+    setHistory((h) => [...h.slice(-19), drag.startElements ?? elements]);
     setFuture([]);
     dragRef.current = null;
     setSnapGuides({});
