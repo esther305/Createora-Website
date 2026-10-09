@@ -1599,7 +1599,10 @@ function CreateoraEditor() {
         </div>
         <div className="editor-top-right">
           <button className="editor-icon-action"><Share2 size={16} /> Share</button>
-          <button className="editor-export" onClick={() => window.print()}><Download size={15} /> Export</button>
+          <div className="editor-export-wrap">
+            <button className="editor-export" onClick={() => setExportMenuOpen((open) => !open)} aria-expanded={exportMenuOpen}><Download size={15} /> Export</button>
+            {exportMenuOpen && <div className="editor-export-menu"><strong>Download design</strong><button onClick={() => void exportImage("png")}>PNG · Best quality</button><button onClick={() => void exportImage("jpeg")}>JPEG · Smaller file</button><small>Exports at 2× resolution</small></div>}
+          </div>
           <div className="editor-avatar">{user?.firstName?.[0] ?? 'C'}</div>
         </div>
       </header>
@@ -1660,21 +1663,21 @@ function CreateoraEditor() {
 
         <section className="editor-stage">
           <div className="editor-stage-head">
-            <div><span>DESIGN</span><strong>1080 × 1080</strong><button className="mobile-inspector-toggle" onClick={() => setMobileInspectorOpen((open) => !open)} aria-expanded={mobileInspectorOpen}>{mobileInspectorOpen ? 'Hide properties' : 'Properties'}</button></div>
-            <div className="editor-zoom"><button onClick={() => setZoom(Math.max(25, zoom - 10))} aria-label="Zoom out">−</button><span>{zoom}%</span><button onClick={() => setZoom(Math.min(120, zoom + 10))} aria-label="Zoom in"><ZoomIn size={14} /></button><button className="editor-zoom-fit" onClick={() => setZoom(30)} title="Fit canvas to phone">Fit</button></div>
+            <div><span>DESIGN</span><strong>{canvasWidth} × {canvasHeight}</strong><button className="mobile-inspector-toggle" onClick={() => setMobileInspectorOpen((open) => !open)} aria-expanded={mobileInspectorOpen}>{mobileInspectorOpen ? 'Hide properties' : 'Properties'}</button></div>
+            <div className="editor-zoom"><button onClick={() => setZoom(Math.max(20, zoom - 10))} aria-label="Zoom out">−</button><span>{zoom}%</span><button onClick={() => setZoom(Math.min(120, zoom + 10))} aria-label="Zoom in"><ZoomIn size={14} /></button><button className="editor-zoom-fit" onClick={fitCanvasToViewport} title="Fit canvas to workspace">Fit</button></div>
           </div>
-          <div className="editor-canvas-wrap">
+          <div className="editor-canvas-wrap" ref={canvasWrapRef}>
             <div
               className="editor-canvas"
-              style={{ width: 900 * zoom / 100, height: 600 * zoom / 100 }}
+              style={{ width: canvasWidth * zoom / 100, height: canvasHeight * zoom / 100, background: canvasBackground }}
               onPointerDown={() => setSelectedId(null)}
               onPointerMove={handlePointerMove}
               onPointerUp={finishDrag}
               onPointerLeave={finishDrag}
             >
               <div className="editor-canvas-grid" />
-              <div className="editor-ruler editor-ruler-horizontal" aria-hidden="true"><span>0</span><span>225</span><span>450</span><span>675</span><span>900</span></div>
-              <div className="editor-ruler editor-ruler-vertical" aria-hidden="true"><span>0</span><span>150</span><span>300</span><span>450</span><span>600</span></div>
+              <div className="editor-ruler editor-ruler-horizontal" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <span key={index}>{Math.round((canvasWidth / 4) * index)}</span>)}</div>
+              <div className="editor-ruler editor-ruler-vertical" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <span key={index}>{Math.round((canvasHeight / 4) * index)}</span>)}</div>
               {showGuides && snapGuides.x !== undefined && <div className="editor-snap-guide editor-snap-guide-x" style={{ left: snapGuides.x * zoom / 100 }}><span>{snapGuides.x}</span></div>}
               {showGuides && snapGuides.y !== undefined && <div className="editor-snap-guide editor-snap-guide-y" style={{ top: snapGuides.y * zoom / 100 }}><span>{snapGuides.y}</span></div>}
               {elements.map((element) => (
@@ -1685,15 +1688,27 @@ function CreateoraEditor() {
                     visibility: hiddenLayers.has(element.id) ? 'hidden' : 'visible',
                     left: element.x * zoom / 100, top: element.y * zoom / 100,
                     width: element.width * zoom / 100, height: element.height * zoom / 100,
-                    transform: `rotate(${element.rotation}deg)`,
+                    transform: 'rotate(' + element.rotation + 'deg) scaleX(' + (element.flipX ? -1 : 1) + ') scaleY(' + (element.flipY ? -1 : 1) + ')',
                     background: element.type === 'shape' ? element.color : undefined,
+                    color: element.type === 'text' ? element.color || '#151915' : undefined,
+                    fontSize: element.type === 'text' ? (element.fontSize ?? 45) + 'px' : undefined,
+                    fontFamily: element.type === 'text' ? element.fontFamily || 'DM Sans' : undefined,
+                    fontWeight: element.type === 'text' ? element.fontWeight ?? 800 : undefined,
+                    fontStyle: element.type === 'text' && element.italic ? 'italic' : undefined,
+                    textAlign: element.type === 'text' ? element.textAlign || 'left' : undefined,
+                    justifyContent: element.type === 'text' ? (element.textAlign === 'center' ? 'center' : element.textAlign === 'right' ? 'flex-end' : 'flex-start') : undefined,
+                    opacity: element.opacity ?? 1,
+                    borderRadius: (element.borderRadius ?? (element.type === 'shape' ? 18 : element.type === 'image' ? 4 : 0)) + 'px',
+                    border: element.strokeColor && (element.strokeWidth ?? 0) > 0 ? (element.strokeWidth + 'px solid ' + element.strokeColor) : undefined,
+                    filter: element.type === 'image' || element.type === 'video' ? 'brightness(' + (element.brightness ?? 100) + '%) contrast(' + (element.contrast ?? 100) + '%) saturate(' + (element.saturation ?? 100) + '%) grayscale(' + (element.grayscale ?? 0) + '%) blur(' + (element.blur ?? 0) + 'px)' : undefined,
                   }}
                   onPointerDown={(event) => { if (lockedLayers.has(element.id) || hiddenLayers.has(element.id)) { event.stopPropagation(); setSelectedId(element.id); return; } handlePointerDown(event, element); }}
                 >
                   {element.type === 'text' && <span>{element.text}</span>}
-                  {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} />}
-                  {element.type === 'video' && element.src && <video src={element.src} muted playsInline preload="metadata" draggable={false} />}
-                  {selectedId === element.id && <span className="editor-selection-label">{cropMode ? 'CROP' : element.type.toUpperCase()}</span>}
+                  {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} style={{ objectFit: element.fit ?? "cover" }} />}
+                  {element.type === 'video' && element.src && <video src={element.src} muted playsInline preload="metadata" draggable={false} style={{ objectFit: element.fit ?? "cover" }} />}
+                  {selectedId === element.id && <span className="editor-selection-label">{element.type.toUpperCase()}</span>}
+                  {selectedId === element.id && tool === "select" && ["nw", "n", "ne", "e", "se", "s", "sw", "w"].map((handle) => <button type="button" key={handle} className={"editor-transform-handle handle-" + handle} aria-label={"Resize " + element.type + " " + handle} onPointerDown={(event) => startResize(event, element, handle)} />)}
                 </div>
               ))}
               {!elements.length && (
