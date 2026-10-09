@@ -136,7 +136,7 @@ router.post("/assets/cloudinary/finalize", async (req, res) => {
   }
 
   try {
-    const { client: cloudinary, cloudName, apiKey } = getCloudinary();
+    const { client: cloudinary, cloudName, apiKey, apiSecret } = getCloudinary();
 
     const expectedPrefix = `https://res.cloudinary.com/${cloudName}/`;
     if (!secureUrl.startsWith(expectedPrefix)) {
@@ -147,6 +147,7 @@ router.post("/assets/cloudinary/finalize", async (req, res) => {
     const verified = cloudinary.utils.verify_api_response_signature(
       { public_id: publicId, version },
       responseSignature,
+      apiSecret,
     );
 
     if (!verified) {
