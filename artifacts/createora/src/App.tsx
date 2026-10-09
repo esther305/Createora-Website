@@ -912,6 +912,7 @@ type EditorElement = {
   flipY?: boolean;
   strokeColor?: string;
   strokeWidth?: number;
+  shapeKind?: 'rectangle' | 'ellipse';
 };
 
 const canvasPresets = [
@@ -1246,7 +1247,7 @@ function CreateoraEditor() {
 
   const addShape = () => addElement({
     id: crypto.randomUUID(), type: 'shape', x: 270, y: 240, width: 260, height: 160,
-    rotation: 0, color: '#2f9e64', opacity: 1, borderRadius: 18
+    rotation: 0, color: '#2f9e64', opacity: 1, borderRadius: 18, shapeKind: 'rectangle'
   });
 
   const onUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -1434,10 +1435,14 @@ function CreateoraEditor() {
         const left = -width / 2, top = -height / 2;
 
         if (element.type === 'shape') {
-          roundedPath(left, top, width, height, element.borderRadius ?? 18);
+          if (element.shapeKind === 'ellipse') {
+            ctx.beginPath(); ctx.ellipse(0, 0, width / 2, height / 2, 0, 0, Math.PI * 2); ctx.closePath();
+          } else roundedPath(left, top, width, height, element.borderRadius ?? 18);
           ctx.fillStyle = element.color || '#2f9e64';
           ctx.fill();
           if (element.strokeColor && (element.strokeWidth ?? 0) > 0) {
+            if (element.shapeKind === 'ellipse') { ctx.beginPath(); ctx.ellipse(0, 0, width / 2, height / 2, 0, 0, Math.PI * 2); ctx.closePath(); }
+            else roundedPath(left, top, width, height, element.borderRadius ?? 18);
             ctx.strokeStyle = element.strokeColor;
             ctx.lineWidth = element.strokeWidth ?? 1;
             ctx.stroke();
@@ -1724,7 +1729,7 @@ function CreateoraEditor() {
                     textAlign: element.type === 'text' ? element.textAlign || 'left' : undefined,
                     justifyContent: element.type === 'text' ? (element.textAlign === 'center' ? 'center' : element.textAlign === 'right' ? 'flex-end' : 'flex-start') : undefined,
                     opacity: element.opacity ?? 1,
-                    borderRadius: (element.borderRadius ?? (element.type === 'shape' ? 18 : element.type === 'image' ? 4 : 0)) + 'px',
+                    borderRadius: element.type === 'shape' && element.shapeKind === 'ellipse' ? '50%' : (element.borderRadius ?? (element.type === 'shape' ? 18 : element.type === 'image' ? 4 : 0)) + 'px',
                     border: element.strokeColor && (element.strokeWidth ?? 0) > 0 ? (element.strokeWidth + 'px solid ' + element.strokeColor) : undefined,
                   }}
                   onPointerDown={(event) => { if (lockedLayers.has(element.id) || hiddenLayers.has(element.id)) { event.stopPropagation(); setSelectedId(element.id); return; } handlePointerDown(event, element); }}
@@ -1923,6 +1928,7 @@ function CreateoraEditor() {
                   {selected.type === 'shape' && <div className="inspector-section">
                     <label>Shape style</label>
                     <div className="inspector-control-stack">
+                      <label>Shape type<select value={selected.shapeKind || 'rectangle'} onChange={(event) => updateSelected({ shapeKind: event.target.value as 'rectangle' | 'ellipse' })}><option value="rectangle">Rounded rectangle</option><option value="ellipse">Ellipse / circle</option></select></label>
                       <label>Corner radius · {selected.borderRadius ?? 18}px<input type="range" min="0" max="120" value={selected.borderRadius ?? 18} onChange={(event) => updateSelected({ borderRadius: Number(event.target.value) })} /></label>
                       <label>Outline color<input type="color" className="inspector-color-input" value={selected.strokeColor || '#2f9e64'} onChange={(event) => updateSelected({ strokeColor: event.target.value, strokeWidth: selected.strokeWidth ?? 2 })} /></label>
                       <label>Outline width · {selected.strokeWidth ?? 0}px<input type="range" min="0" max="20" value={selected.strokeWidth ?? 0} onChange={(event) => updateSelected({ strokeWidth: Number(event.target.value) })} /></label>
