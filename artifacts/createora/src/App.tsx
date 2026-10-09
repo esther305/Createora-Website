@@ -1319,6 +1319,194 @@ function CreateoraEditor() {
     setSelectedId(null);
   };
 
+
+  const applyCanvasPreset = (width: number, height: number) => {
+    setCanvasWidth(width);
+    setCanvasHeight(height);
+    commit(elements.map((element) => ({
+      ...element,
+      x: Math.max(0, Math.min(Math.max(0, width - element.width), element.x)),
+      y: Math.max(0, Math.min(Math.max(0, height - element.height), element.y)),
+    })));
+  };
+
+  const fitCanvasToViewport = () => {
+    const viewport = canvasWrapRef.current;
+    if (!viewport) return;
+    const availableWidth = Math.max(120, viewport.clientWidth - 48);
+    const availableHeight = Math.max(120, viewport.clientHeight - 48);
+    const fit = Math.floor(Math.min(availableWidth / canvasWidth, availableHeight / canvasHeight) * 100);
+    setZoom(Math.max(20, Math.min(100, fit)));
+  };
+
+  const exportImage = async (format: 'png' | 'jpeg') => {
+    setExportMenuOpen(false);
+    try {
+      const scale = 2;
+      const output = document.createElement('canvas');
+      output.width = canvasWidth * scale;
+      output.height = canvasHeight * scale;
+      const ctx = output.getContext('2d');
+      if (!ctx) throw new Error('Your browser could not create the export canvas.');
+      ctx.scale(scale, scale);
+      ctx.fillStyle = canvasBackground;
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      const roundedPath = (x: number, y: number, width: number, height: number, requestedRadius: number) => {
+        const radius = Math.max(0, Math.min(requestedRadius, width / 2, height / 2));
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+      };
+
+      for (const element of elements) {
+        if (hiddenLayers.has(element.id)) continue;
+        const x = element.x, y = element.y, width = element.width, height = element.height;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, Math.min(1, element.opacity ?? 1));
+        ctx.translate(x + width / 2, y + height / 2);
+        ctx.rotate((element.rotation * Math.PI) / 180);
+        ctx.scale(element.flipX ? -1 : 1, element.flipY ? -1 : 1);
+        const left = -width / 2, top = -height / 2;
+
+        if (element.type === 'shape') {
+          roundedPath(left, top, width, height, element.borderRadius ?? 18);
+          ctx.fillStyle = element.color || '#2f9e64';
+          ctx.fill();
+          if (element.strokeColor && (element.strokeWidth ?? 0) > 0) {
+            ctx.strokeStyle = element.strokeColor;
+            ctx.lineWidth = element.strokeWidth ?? 1;
+            ctx.stroke();
+          }
+        } else if (element.type === 'text') {
+          const fontSize = element.fontSize ?? 45;
+          ctx.fillStyle = element.color || '#151915';
+          ctx.font = (element.italic ? 'italic ' : '') + (element.fontWeight ?? 800) + ' ' + fontSize + 'px "' + (element.fontFamily || 'DM Sans').replace(/"/g, '') + '"';
+          ctx.textBaseline = 'top';
+          ctx.textAlign = element.textAlign ?? 'left';
+          const padding = 10;
+          const maxWidth = Math.max(1, width - padding * 2);
+          const lines: string[] = [];
+          for (const paragraph of (element.text || '').split('\n')) {
+            let line = '';
+            for (const word of paragraph.split(/\s+/).filter(Boolean)) {
+              const candidate = line ? line + ' ' + word : word;
+              if (line && ctx.measureText(candidate).width > maxWidth) { lines.push(line); line = word; }
+              else line = candidate;
+            }
+            lines.push(line);
+          }
+          const lineHeight = fontSize * 1.08;
+          const textX = element.textAlign === 'center' ? 0 : element.textAlign === 'right' ? width / 2 - padding : left + padding;
+          lines.forEach((line, index) => {
+            if ((index + 1) * lineHeight <= height) ctx.fillText(line, textX, top + padding + index * lineHeight, maxWidth);
+          });
+        } else if ((element.type === 'image' || element.type === 'video') && element.src) {
+          let drawable: CanvasImageSource;
+          let sourceWidth = 0, sourceHeight = 0;
+          if (element.type === 'image') {
+            const image = new Image();
+            image.crossOrigin = 'anonymous';
+            image.src = element.src;
+            await new Promise<void>((resolve, reject) => {
+              if (image.complete && image.naturalWidth) resolve();
+              else {
+                image.onload = () => resolve();
+                image.onerror = () => reject(new Error('An image could not be loaded for export. Try re-uploading it.'));
+              }
+            });
+            drawable = image; sourceWidth = image.naturalWidth; sourceHeight = image.naturalHeight;
+          } else {
+            const video = document.createElement('video');
+            video.crossOrigin = 'anonymous'; video.muted = true; video.playsInline = true; video.preload = 'auto'; video.src = element.src;
+            await new Promise<void>((resolve, reject) => {
+              if (video.readyState >= 2) resolve();
+              else {
+                video.onloadeddata = () => resolve();
+                video.onerror = () => reject(new Error('A video frame could not be loaded for export.'));
+              }
+            });
+            drawable = video; sourceWidth = video.videoWidth; sourceHeight = video.videoHeight;
+          }
+          ctx.filter = 'brightness(' + (element.brightness ?? 100) + '%) contrast(' + (element.contrast ?? 100) + '%) saturate(' + (element.saturation ?? 100) + '%) grayscale(' + (element.grayscale ?? 0) + '%) blur(' + (element.blur ?? 0) + 'px)';
+          roundedPath(left, top, width, height, element.borderRadius ?? 4);
+          ctx.clip();
+          if ((element.fit ?? 'cover') === 'contain') {
+            const fitScale = Math.min(width / sourceWidth, height / sourceHeight);
+            const drawWidth = sourceWidth * fitScale, drawHeight = sourceHeight * fitScale;
+            ctx.drawImage(drawable, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+          } else {
+            const sourceAspect = sourceWidth / sourceHeight, frameAspect = width / height;
+            let sx = 0, sy = 0, sw = sourceWidth, sh = sourceHeight;
+            if (sourceAspect > frameAspect) { sw = sourceHeight * frameAspect; sx = (sourceWidth - sw) / 2; }
+            else { sh = sourceWidth / frameAspect; sy = (sourceHeight - sh) / 2; }
+            ctx.drawImage(drawable, sx, sy, sw, sh, left, top, width, height);
+          }
+          ctx.filter = 'none';
+          if (element.strokeColor && (element.strokeWidth ?? 0) > 0) {
+            roundedPath(left, top, width, height, element.borderRadius ?? 4);
+            ctx.strokeStyle = element.strokeColor; ctx.lineWidth = element.strokeWidth ?? 1; ctx.stroke();
+          }
+        }
+        ctx.restore();
+      }
+
+      const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        output.toBlob((result) => result ? resolve(result) : reject(new Error('Image export failed. Try PNG or reduce the image size.')), mimeType, 0.94);
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      const safeName = projectName.trim().replace(/[^a-z0-9-_]+/gi, '-').replace(/^-|-$/g, '') || 'createora-design';
+      anchor.href = url;
+      anchor.download = safeName + (format === 'jpeg' ? '.jpg' : '.png');
+      document.body.appendChild(anchor); anchor.click(); anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Unable to export this design.');
+    }
+  };
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const editingText = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable || target.tagName === 'SELECT');
+      if (editingText) {
+        if (event.key === 'Escape') { setSelectedId(null); setMobileInspectorOpen(false); }
+        return;
+      }
+      const mod = event.ctrlKey || event.metaKey;
+      if (mod && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo(); return; }
+      if (mod && event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); return; }
+      if (mod && event.key.toLowerCase() === 'd') { event.preventDefault(); duplicateSelected(); return; }
+      if (event.key === 'Escape') { setSelectedId(null); setMobileInspectorOpen(false); setExportMenuOpen(false); return; }
+      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedId) { event.preventDefault(); removeSelected(); return; }
+      if (selectedId && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+        event.preventDefault();
+        const step = event.shiftKey ? 10 : 1;
+        const item = elements.find((entry) => entry.id === selectedId);
+        if (!item) return;
+        const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
+        const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
+        commit(elements.map((entry) => entry.id === selectedId ? {
+          ...entry,
+          x: Math.max(0, Math.min(canvasWidth - entry.width, entry.x + dx)),
+          y: Math.max(0, Math.min(canvasHeight - entry.height, entry.y + dy)),
+        } : entry));
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [selectedId, elements, history, future, canvasWidth, canvasHeight]);
+
   const handlePointerDown = (event: PointerEvent, element: EditorElement) => {
     if (tool !== 'select') return;
     event.stopPropagation();
