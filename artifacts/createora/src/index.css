@@ -1447,3 +1447,72 @@ button,input,textarea,select{max-width:100%}
     background:#151716;
   }
 }
+
+
+/* Mobile editor quick actions and canvas fit */
+.editor-mobile-actions { display:none; }
+.editor-zoom-fit { display:none!important; }
+
+@media (max-width:760px) {
+  .editor-mobile-actions {
+    display:flex;
+    align-items:stretch;
+    gap:6px;
+    flex:0 0 auto;
+    width:100%;
+    padding:8px 9px calc(8px + env(safe-area-inset-bottom, 0px));
+    overflow-x:auto;
+    overscroll-behavior-x:contain;
+    scrollbar-width:none;
+    border-top:1px solid #2a312c;
+    background:#171a18;
+  }
+  .editor-mobile-actions::-webkit-scrollbar { display:none; }
+  .editor-mobile-actions button {
+    display:flex;
+    flex:1 0 56px;
+    min-width:56px;
+    min-height:44px;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+    padding:5px 7px;
+    border:1px solid #303832;
+    border-radius:8px;
+    background:#202521;
+    color:#9aa59d;
+    font-size:9px;
+    font-weight:600;
+    white-space:nowrap;
+    touch-action:manipulation;
+  }
+  .editor-mobile-actions button.active,
+  .editor-mobile-actions button:focus-visible {
+    border-color:#459968;
+    background:#203328;
+    color:#8de0a8;
+    outline:none;
+  }
+  .editor-zoom { gap:6px; }
+  .editor-zoom button { width:34px; height:34px; flex:0 0 34px; font-size:16px; touch-action:manipulation; }
+  .editor-zoom span { min-width:34px; }
+  .editor-zoom .editor-zoom-fit {
+    display:grid!important;
+    width:auto;
+    min-width:38px;
+    padding:0 7px;
+    border:1px solid #3a5945;
+    background:#203328;
+    color:#9ae2af;
+    font-size:10px;
+    font-weight:700;
+  }
+}
+
+@media (max-width:520px) {
+  .editor-mobile-actions { gap:5px; padding:7px 7px calc(7px + env(safe-area-inset-bottom, 0px)); }
+  .editor-mobile-actions button { min-width:53px; flex-basis:53px; min-height:42px; font-size:8px; }
+  .editor-zoom button { width:30px; height:32px; flex-basis:30px; }
+  .editor-zoom .editor-zoom-fit { min-width:34px; padding:0 5px; }
+}
