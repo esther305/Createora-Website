@@ -964,6 +964,7 @@ function CreateoraEditor() {
   const [projectName, setProjectName] = useState('Untitled design');
   const [projectId, setProjectId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('project'));
   const [projectReady, setProjectReady] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error'>('saved');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
@@ -1021,7 +1022,7 @@ function CreateoraEditor() {
           const response = await fetch(`/api/projects/${requestedId}`, { headers: { Authorization: `Bearer ${token}` } });
           const data = await response.json();
           if (!response.ok) throw new Error(data.error || 'Unable to open project');
-          const documentData = data.project.document as { elements?: unknown[]; canvasWidth?: number; canvasHeight?: number; canvasBackground?: string } | null;
+          const documentData = data.project.document as { elements?: unknown[]; canvasWidth?: number; canvasHeight?: number; canvasBackground?: string; hiddenLayers?: unknown[]; lockedLayers?: unknown[]; layerNames?: Record<string, string> } | null;
           const savedElements = Array.isArray(documentData?.elements) ? documentData.elements as EditorElement[] : [];
           if (!cancelled) {
             setProjectId(data.project.id);
@@ -1031,6 +1032,9 @@ function CreateoraEditor() {
             setCanvasWidth(Number(documentData?.canvasWidth) || 900);
             setCanvasHeight(Number(documentData?.canvasHeight) || 600);
             setCanvasBackground(typeof documentData?.canvasBackground === 'string' ? documentData.canvasBackground : '#ffffff');
+            setHiddenLayers(new Set((documentData?.hiddenLayers ?? []).filter((id): id is string => typeof id === 'string')));
+            setLockedLayers(new Set((documentData?.lockedLayers ?? []).filter((id): id is string => typeof id === 'string')));
+            setLayerNames(documentData?.layerNames && typeof documentData.layerNames === 'object' ? documentData.layerNames : {});
             setProjectReady(true);
           }
           return;
@@ -1084,17 +1088,26 @@ function CreateoraEditor() {
   useEffect(() => {
     if (!projectReady || !projectId) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setSaveStatus('saving');
     saveTimerRef.current = setTimeout(() => {
       void (async () => {
         try {
           const token = await getToken();
-          if (!token) return;
-          await fetch(`/api/projects/${projectId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: projectName, document: { version: 2, elements, canvasWidth, canvasHeight, canvasBackground } }) });
-        } catch {}
+          if (!token) { setSaveStatus('error'); return; }
+          const response = await fetch('/api/projects/' + projectId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+            body: JSON.stringify({ name: projectName, document: { version: 2, elements, canvasWidth, canvasHeight, canvasBackground, hiddenLayers: [...hiddenLayers], lockedLayers: [...lockedLayers], layerNames } }),
+          });
+          if (!response.ok) throw new Error('Autosave request failed');
+          setSaveStatus('saved');
+        } catch {
+          setSaveStatus('error');
+        }
       })();
     }, 650);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [elements, projectName, projectId, projectReady, canvasWidth, canvasHeight, canvasBackground]);
+  }, [elements, projectName, projectId, projectReady, canvasWidth, canvasHeight, canvasBackground, hiddenLayers, lockedLayers, layerNames]);
 
 
 
@@ -1634,7 +1647,7 @@ function CreateoraEditor() {
         <div className="editor-top-center">
           <button onClick={undo} disabled={!history.length} aria-label="Undo"><Undo2 size={16} /></button>
           <button onClick={redo} disabled={!future.length} aria-label="Redo"><Redo2 size={16} /></button>
-          <span className="editor-save-dot" /> Saved
+          <span className={"editor-save-dot save-status-" + saveStatus} /> <span aria-live="polite">{saveStatus === "saving" ? "Saving…" : saveStatus === "error" ? "Save failed" : "Saved"}</span>
         </div>
         <div className="editor-top-right">
           <button className="editor-icon-action"><Share2 size={16} /> Share</button>
