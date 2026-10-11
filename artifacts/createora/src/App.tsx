@@ -552,7 +552,6 @@ function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
             data-testid={`link-dashboard-${item.label.toLowerCase()}`}
           >
             {item.icon}<span>{item.label}</span>
-            {item.label === 'Projects' && <small>12</small>}
           </a>
         ))}
 
@@ -710,11 +709,11 @@ function DashboardPage() {
   const credits = profileQuery.data?.credits ?? 30;
   const plan = profileQuery.data?.plan === 'studio' ? 'Studio' : 'Starter';
 
-  const quickCreate: Array<{ title: string; description: string; icon: ReactNode; className: string; action?: () => void }> = [
-    { title: 'AI Image', description: 'Generate a visual from a prompt', icon: <ImagePlus size={22} />, className: 'image' },
-    { title: 'AI Video', description: 'Turn an idea into motion', icon: <Video size={22} />, className: 'video' },
+  const quickCreate: Array<{ title: string; description: string; icon: ReactNode; className: string; action: () => void }> = [
+    { title: 'AI Image', description: 'Start an image project', icon: <ImagePlus size={22} />, className: 'image', action: () => setLocation('/projects?new=image') },
+    { title: 'AI Video', description: 'Start a video project', icon: <Video size={22} />, className: 'video', action: () => setLocation('/projects?new=video') },
     { title: 'New Design', description: 'Start with a blank canvas', icon: <PenLine size={22} />, className: 'design', action: () => setLocation('/projects?new=image') },
-    { title: 'Script', description: 'Write your next story', icon: <FileText size={22} />, className: 'script' },
+    { title: 'Script', description: 'Open your projects to continue creating', icon: <FileText size={22} />, className: 'script', action: () => setLocation('/projects') },
   ];
 
   const [recentProjects, setRecentProjects] = useState<CreateoraProject[]>([]);
@@ -754,7 +753,7 @@ function DashboardPage() {
               <h1>Good morning, {firstName}.</h1>
               <p>What are you making today? Start from an idea or jump straight into a tool.</p>
             </div>
-            <div className="studio-date">AUG 2026 <span>•</span> {plan.toUpperCase()}</div>
+            <div className="studio-date">{new Date().toLocaleDateString(undefined, { month: 'short', year: 'numeric' }).toUpperCase()} <span>•</span> {plan.toUpperCase()}</div>
           </section>
 
           <section className="studio-hero-card">
