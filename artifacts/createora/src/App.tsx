@@ -1392,9 +1392,29 @@ function CreateoraEditor() {
       if (!cutoutContext) throw new Error('Your browser could not prepare the transparent image.');
       cutoutContext.drawImage(modelOutput as CanvasImageSource, 0, 0);
 
-      const resultBlob = await new Promise<Blob>((resolve, reject) => {
-        cutoutCanvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Could not export the transparent image.')), 'image/png');
-      });
+      // Export defensively: some canvas-like implementations expose
+      // convertToBlob() rather than toBlob(). Keep a data-URL fallback for
+      // environments where neither method is available.
+      const exportCanvas = cutoutCanvas as HTMLCanvasElement & {
+        convertToBlob?: (options?: { type?: string }) => Promise<Blob>;
+        toDataURL?: (type?: string) => string;
+      };
+      let resultBlob: Blob;
+      if (typeof exportCanvas.toBlob === 'function') {
+        resultBlob = await new Promise<Blob>((resolve, reject) => {
+          exportCanvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Could not export the transparent image.')), 'image/png');
+        });
+      } else if (typeof exportCanvas.convertToBlob === 'function') {
+        resultBlob = await exportCanvas.convertToBlob({ type: 'image/png' });
+      } else if (typeof exportCanvas.toDataURL === 'function') {
+        const dataUrl = exportCanvas.toDataURL('image/png');
+        const response = await fetch(dataUrl);
+        if (!response.ok) throw new Error('Could not export the transparent image.');
+        resultBlob = await response.blob();
+      } else {
+        throw new Error('This browser cannot export the transparent image. Please try an updated version of Chrome, Edge, or Firefox.');
+      }
+      if (!resultBlob.size) throw new Error('The transparent image export was empty. Please try again.');
       const resultFile = new File([resultBlob], 'createora-background-removed.png', { type: 'image/png' });
       const asset = await uploadAssetDirect(resultFile, token, {
         width: cutoutCanvas.width,
