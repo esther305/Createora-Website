@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type ChangeEvent, type PointerEvent } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useSignIn, useUser } from '@clerk/react';
+import { ClerkProvider, SignIn, SignUp, UserProfile, useAuth, useClerk, useSignIn, useUser } from '@clerk/react';
 import { shadcn } from '@clerk/themes';
 import {
   getGetProfileQueryKey,
@@ -522,13 +522,13 @@ const dashboardTools = [
   { title: 'Caption Generator', description: 'Say it clearly, then adapt it for every channel.', icon: <MessageSquareText size={19} /> },
 ];
 
-function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
+function DashboardSidebar({ onLogout, credits, plan, workspaceName, accountEmail }: { onLogout: () => void; credits: number; plan: string; workspaceName: string; accountEmail: string }) {
   const [location, setLocation] = useLocation();
   const sidebarItems = [
     { label: 'Home', href: '/dashboard', icon: <LayoutDashboard size={17} /> },
     { label: 'Projects', href: '/projects', icon: <FolderKanban size={17} /> },
     { label: 'Assets', href: '/assets', icon: <FileBox size={17} /> },
-    { label: 'Templates', href: '/dashboard#templates', icon: <Layers3 size={17} /> },
+    { label: 'Templates', href: '/templates', icon: <Layers3 size={17} /> },
   ];
   return (
     <aside className="studio-sidebar">
@@ -547,7 +547,7 @@ function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
         <span className="studio-nav-label">Workspace</span>
         {sidebarItems.map((item) => (
           <a
-            className={`studio-nav-item ${(item.label === 'Home' && location === '/dashboard') || (item.label === 'Projects' && location === '/projects') || (item.label === 'Assets' && location === '/assets') ? 'active' : ''}`}
+            className={`studio-nav-item ${(item.label === 'Home' && location === '/dashboard') || (item.label === 'Projects' && location === '/projects') || (item.label === 'Assets' && location === '/assets') || (item.label === 'Templates' && location.startsWith('/templates')) ? 'active' : ''}`}
             key={item.label}
             href={item.href}
             onClick={(event) => {
@@ -556,7 +556,7 @@ function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
                 setLocation(item.href);
               }
             }}
-            aria-current={(item.label === 'Home' && location === '/dashboard') || (item.label === 'Projects' && location === '/projects') || (item.label === 'Assets' && location === '/assets') ? 'page' : undefined}
+            aria-current={(item.label === 'Home' && location === '/dashboard') || (item.label === 'Projects' && location === '/projects') || (item.label === 'Assets' && location === '/assets') || (item.label === 'Templates' && location.startsWith('/templates')) ? 'page' : undefined}
             data-testid={`link-dashboard-${item.label.toLowerCase()}`}
           >
             {item.icon}<span>{item.label}</span>
@@ -572,21 +572,20 @@ function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
 
         <span className="studio-nav-label studio-nav-spaced">Account</span>
         <span className="studio-nav-item" aria-disabled="true" title="Billing page coming soon"><CreditCard size={17} /><span>Billing · Soon</span></span>
-        <span className="studio-nav-item" aria-disabled="true" title="Settings page coming soon"><Settings size={17} /><span>Settings · Soon</span></span>
+        <a className={`studio-nav-item ${location.startsWith('/account') ? 'active' : ''}`} href="/account" aria-current={location.startsWith('/account') ? 'page' : undefined}><Settings size={17} /><span>Account</span></a>
       </nav>
 
       <div className="studio-sidebar-bottom">
         <div className="studio-credit-mini">
-          <div><span>AI credits</span><strong>30 left</strong></div>
-          <div className="studio-credit-track"><span /></div>
-          <small>Starter plan · <a href="#billing">Upgrade</a></small>
+          <div><span>AI credits</span><strong>{credits} left</strong></div>
+          <small>{plan} plan · Plan details coming soon</small>
         </div>
         <a className="studio-help" href="mailto:hello@createora.co"><CircleHelp size={16} /> Help center</a>
-        <button className="studio-user-row" data-testid="button-dashboard-profile">
-          <span className="studio-user-avatar">K</span>
-          <span><strong>My workspace</strong><small>Personal</small></span>
+        <div className="studio-user-row" data-testid="button-dashboard-profile" title={accountEmail || workspaceName}>
+          <span className="studio-user-avatar">{workspaceName.trim().charAt(0).toUpperCase() || 'C'}</span>
+          <span><strong>{workspaceName}</strong><small>{accountEmail || 'Personal workspace'}</small></span>
           <MoreHorizontal size={16} />
-        </button>
+        </div>
         <button className="studio-logout" onClick={onLogout} data-testid="button-dashboard-logout">
           <LogOut size={15} /> Log out
         </button>
@@ -703,6 +702,89 @@ function ProjectsPage() {
   );
 }
 
+
+type CreateoraTemplate = {
+  id: string; title: string; description: string; category: 'Social' | 'Ads' | 'Video' | 'Branding';
+  type: 'image' | 'video'; width: number; height: number; artClass: string; artText: string;
+  background: string; accent: string; headline: string; subline: string;
+};
+const createoraTemplates: CreateoraTemplate[] = [
+  { id:'product-launch', title:'Product launch', description:'A bold launch announcement for a new product or collection.', category:'Social', type:'image', width:1080, height:1920, artClass:'template-social', artText:'NEW\nDROP', background:'#f4e6d7', accent:'#f16c3d', headline:'NEW DROP', subline:'Meet your new favourite.' },
+  { id:'promo-campaign', title:'Promo campaign', description:'A high-contrast sale graphic for offers and limited-time deals.', category:'Ads', type:'image', width:1080, height:1080, artClass:'template-promo', artText:'BIG\nSALE', background:'#1d2521', accent:'#c7f36b', headline:'BIG SALE', subline:'Good things. Better prices.' },
+  { id:'story-reel', title:'Story reel', description:'A vertical title card to start a short video or story.', category:'Video', type:'video', width:1080, height:1920, artClass:'template-reel', artText:'YOUR\nSTORY', background:'#e9e0fb', accent:'#7044c8', headline:'YOUR STORY', subline:'Make them stop and watch.' },
+  { id:'brand-announcement', title:'Brand announcement', description:'A clean branded post for updates, milestones and news.', category:'Branding', type:'image', width:1080, height:1350, artClass:'template-brand', artText:'BRAND\nNOTE', background:'#d9eee3', accent:'#236b4b', headline:'A NOTE FROM US', subline:'Something good is on the way.' },
+  { id:'weekly-offer', title:'Weekly offer', description:'A simple square promotion with a clear offer and call to action.', category:'Ads', type:'image', width:1080, height:1080, artClass:'template-promo', artText:'THIS\nWEEK', background:'#fff0d4', accent:'#b84c2f', headline:'THIS WEEK ONLY', subline:'Your next favourite deal awaits.' },
+  { id:'creator-intro', title:'Creator intro', description:'A vertical opener for personal brands, creators and portfolios.', category:'Social', type:'video', width:1080, height:1920, artClass:'template-reel', artText:'MEET\nTHE MAKER', background:'#e4e8ff', accent:'#4a56a8', headline:'MEET THE MAKER', subline:'A little about what I do.' },
+];
+
+function TemplateLibraryPage() {
+  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const [, setLocation] = useLocation();
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('All');
+  const [busyId, setBusyId] = useState('');
+  const [error, setError] = useState('');
+  const [selectedId, setSelectedId] = useState(() => new URLSearchParams(window.location.search).get('template') ?? '');
+  const categories = ['All', 'Social', 'Ads', 'Video', 'Branding'];
+  const visibleTemplates = createoraTemplates.filter((template) =>
+    (category === 'All' || template.category === category) &&
+    (template.title + ' ' + template.description + ' ' + template.category).toLowerCase().includes(query.trim().toLowerCase())
+  );
+  const useTemplate = async (template: CreateoraTemplate) => {
+    if (busyId) return;
+    setBusyId(template.id); setError('');
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Your session expired. Please sign in again.');
+      const response = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body:JSON.stringify({name:template.title,type:template.type,width:template.width,height:template.height}) });
+      const data = await response.json();
+      if (!response.ok || !data.project?.id) throw new Error(data.error || 'Unable to create a project from this template.');
+      const width = template.width, height = template.height;
+      const elements = [
+        { id:crypto.randomUUID(), type:'shape', x:width*0.07, y:height*0.09, width:width*0.86, height:height*0.82, rotation:0, shapeKind:'rectangle', color:template.background, borderRadius:24, opacity:100 },
+        { id:crypto.randomUUID(), type:'shape', x:width*0.13, y:height*0.16, width:width*0.74, height:height*0.025, rotation:0, shapeKind:'rectangle', color:template.accent, borderRadius:8, opacity:100 },
+        { id:crypto.randomUUID(), type:'text', x:width*0.13, y:height*0.34, width:width*0.74, height:height*0.22, rotation:0, text:template.headline, color:template.accent, fontSize:Math.round(Math.min(width,height)*0.105), fontFamily:'Arial', fontWeight:800, textAlign:'left', opacity:100 },
+        { id:crypto.randomUUID(), type:'text', x:width*0.13, y:height*0.59, width:width*0.7, height:height*0.1, rotation:0, text:template.subline, color:template.type === 'video' ? '#29223a' : '#242824', fontSize:Math.round(Math.min(width,height)*0.035), fontFamily:'Arial', fontWeight:500, textAlign:'left', opacity:100 },
+        { id:crypto.randomUUID(), type:'shape', x:width*0.13, y:height*0.76, width:width*0.4, height:height*0.055, rotation:0, shapeKind:'rectangle', color:template.accent, borderRadius:16, opacity:100 },
+        { id:crypto.randomUUID(), type:'text', x:width*0.16, y:height*0.77, width:width*0.36, height:height*0.04, rotation:0, text:'LEARN MORE  ↗', color:template.background, fontSize:Math.round(Math.min(width,height)*0.022), fontFamily:'Arial', fontWeight:700, textAlign:'center', opacity:100 },
+      ];
+      const patch = await fetch('/api/projects/'+data.project.id, { method:'PATCH', headers:{'Content-Type':'application/json',Authorization:'Bearer '+token}, body:JSON.stringify({document:{version:2,elements,canvasWidth:width,canvasHeight:height,canvasBackground:'#ffffff'}}) });
+      if (!patch.ok) throw new Error('The project was created, but the template layout could not be saved. Open it from Projects and try again.');
+      setLocation('/editor?project='+data.project.id);
+    } catch (err) { setError(err instanceof Error ? err.message : 'Unable to use template'); setBusyId(''); }
+  };
+  if (!isLoaded) return <main className="template-loading">Loading templates…</main>;
+  if (!isSignedIn) return <Redirect to="/sign-in" />;
+  return <main className="template-library-page">
+    <header className="template-library-header"><button className="template-back" onClick={() => setLocation('/dashboard')} aria-label="Back to dashboard"><ArrowRight size={16}/></button><Wordmark/><span className="template-divider"/><div><span>CREATEORA STUDIO</span><strong>Template library</strong></div><button className="template-account-link" onClick={() => setLocation('/account')}><Settings size={15}/> Account</button></header>
+    <section className="template-library-main">
+      <div className="template-library-intro"><span className="eyebrow">START WITH A STRONG FIRST DRAFT</span><h1>Good ideas deserve<br/><em>a head start.</em></h1><p>Choose a layout, then make the words, colours and details your own. Each template opens as an editable project.</p></div>
+      <div className="template-library-toolbar"><label><Target size={15}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search templates…" aria-label="Search templates"/></label><div className="template-category-tabs">{categories.map(item=><button key={item} className={category===item?'active':''} onClick={()=>setCategory(item)}>{item}</button>)}</div></div>
+      {error && <div className="projects-error">{error}</div>}
+      <div className="template-library-grid">{visibleTemplates.map(template=><article className={'template-library-card '+(selectedId===template.id?'selected':'')} key={template.id}>
+        <button className={'template-library-art '+template.artClass} onClick={()=>setSelectedId(template.id)} aria-label={'Preview '+template.title}><span className="template-preview-chip">{template.category} · {template.height===1920?'9:16':template.height===1350?'4:5':'1:1'}</span><span className="template-preview-title">{template.artText.split('\n').map((line,i)=><span key={i}>{line}</span>)}</span><span className="template-preview-shape" /></button>
+        <div className="template-library-card-copy"><div><strong>{template.title}</strong><p>{template.description}</p></div><button onClick={()=>void useTemplate(template)} disabled={Boolean(busyId)}>{busyId===template.id?'Creating…':'Use template'} <ArrowUpRight size={14}/></button></div>
+      </article>)}</div>
+      {!visibleTemplates.length && <div className="projects-empty"><strong>No templates match that search</strong><span>Try another keyword or choose a different category.</span><button onClick={()=>{setQuery('');setCategory('All')}}>Clear filters</button></div>}
+    </section>
+  </main>;
+}
+
+function AccountPage() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
+  const [, setLocation] = useLocation();
+  if (!isLoaded) return <main className="template-loading">Loading account…</main>;
+  if (!isSignedIn) return <Redirect to="/sign-in" />;
+  return <main className="account-page">
+    <header className="template-library-header"><button className="template-back" onClick={() => setLocation('/dashboard')} aria-label="Back to dashboard"><ArrowRight size={16}/></button><Wordmark/><span className="template-divider"/><div><span>WORKSPACE</span><strong>Account settings</strong></div><button className="template-account-link" onClick={() => setLocation('/templates')}><Layers3 size={15}/> Templates</button></header>
+    <section className="account-page-main"><div className="account-page-intro"><span className="eyebrow">YOUR PROFILE</span><h1>Account &<br/><em>preferences.</em></h1><p>Manage your Createora sign-in details, profile information and account security.</p><div className="account-identity"><span>{user?.firstName?.charAt(0)||user?.username?.charAt(0)||'C'}</span><div><strong>{user?.fullName||user?.username||'Createora creator'}</strong><small>{user?.primaryEmailAddress?.emailAddress||'Signed-in account'}</small></div></div></div>
+      <div className="account-profile-panel"><UserProfile routing="hash" /></div>
+    </section>
+  </main>;
+}
+
+
 function DashboardPage() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
@@ -739,7 +821,7 @@ function DashboardPage() {
 
   return (
     <main className="studio-shell">
-      <DashboardSidebar onLogout={() => signOut({ redirectUrl: basePath || '/' })} />
+      <DashboardSidebar onLogout={() => signOut({ redirectUrl: basePath || '/' })} credits={credits} plan={plan} workspaceName={user?.fullName || user?.username || 'My workspace'} accountEmail={user?.primaryEmailAddress?.emailAddress || ''} />
 
       <section className="studio-main">
         <header className="studio-topbar">
@@ -840,13 +922,13 @@ function DashboardPage() {
           <section className="studio-section studio-templates" id="templates">
             <div className="studio-section-head">
               <div><span className="studio-eyebrow">START FASTER</span><h2>Popular templates</h2></div>
-              <a href="#templates">Browse library <ArrowRight size={14} /></a>
+              <button onClick={() => setLocation('/templates')}>Browse library <ArrowRight size={14} /></button>
             </div>
             <div className="studio-template-row">
-              <button className="studio-template-card"><span className="template-art template-social">NEW<br />DROP</span><strong>Product launch</strong><small>Social · 9:16</small></button>
-              <button className="studio-template-card"><span className="template-art template-promo">BIG<br />SALE</span><strong>Promo campaign</strong><small>Ad · 1:1</small></button>
-              <button className="studio-template-card"><span className="template-art template-reel">YOUR<br />STORY</span><strong>Story reel</strong><small>Video · 9:16</small></button>
-              <button className="studio-template-card"><span className="template-art template-brand">BRAND<br />NOTE</span><strong>Brand announcement</strong><small>Post · 4:5</small></button>
+              <button className="studio-template-card" onClick={() => setLocation('/templates?template=product-launch')}><span className="template-art template-social">NEW<br />DROP</span><strong>Product launch</strong><small>Social · 9:16</small></button>
+              <button className="studio-template-card" onClick={() => setLocation('/templates?template=promo-campaign')}><span className="template-art template-promo">BIG<br />SALE</span><strong>Promo campaign</strong><small>Ad · 1:1</small></button>
+              <button className="studio-template-card" onClick={() => setLocation('/templates?template=story-reel')}><span className="template-art template-reel">YOUR<br />STORY</span><strong>Story reel</strong><small>Video · 9:16</small></button>
+              <button className="studio-template-card" onClick={() => setLocation('/templates?template=brand-announcement')}><span className="template-art template-brand">BRAND<br />NOTE</span><strong>Brand announcement</strong><small>Post · 4:5</small></button>
             </div>
           </section>
         </div>
@@ -2179,6 +2261,8 @@ function AppRoutes() {
         <Route path="/forgot-password" component={ForgotPasswordPage} />
         <Route path="/dashboard" component={DashboardPage} />
         <Route path="/assets" component={MediaLibraryPage} />
+        <Route path="/templates" component={TemplateLibraryPage} />
+        <Route path="/account" component={AccountPage} />
         <Route path="/projects" component={ProjectsPage} />
         <Route path="/editor" component={CreateoraEditor} />
         <Route component={NotFound} />
