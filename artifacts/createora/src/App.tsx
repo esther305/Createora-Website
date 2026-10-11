@@ -552,7 +552,6 @@ function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
             data-testid={`link-dashboard-${item.label.toLowerCase()}`}
           >
             {item.icon}<span>{item.label}</span>
-            {item.label === 'Projects' && <small>12</small>}
           </a>
         ))}
 
@@ -611,7 +610,7 @@ function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('search') ?? '');
 
   const loadProjects = async () => {
     const token = await getToken();
@@ -702,6 +701,7 @@ function DashboardPage() {
   const { signOut } = useClerk();
   const [, setLocation] = useLocation();
   const profileQuery = useGetProfile({ query: { enabled: Boolean(isSignedIn), queryKey: getGetProfileQueryKey() } });
+  const [workspaceSearch, setWorkspaceSearch] = useState('');
 
   if (!isLoaded) return <main className="studio-loading">Loading your studio…</main>;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
@@ -710,11 +710,11 @@ function DashboardPage() {
   const credits = profileQuery.data?.credits ?? 30;
   const plan = profileQuery.data?.plan === 'studio' ? 'Studio' : 'Starter';
 
-  const quickCreate: Array<{ title: string; description: string; icon: ReactNode; className: string; action?: () => void }> = [
-    { title: 'AI Image', description: 'Generate a visual from a prompt', icon: <ImagePlus size={22} />, className: 'image' },
-    { title: 'AI Video', description: 'Turn an idea into motion', icon: <Video size={22} />, className: 'video' },
+  const quickCreate: Array<{ title: string; description: string; icon: ReactNode; className: string; action: () => void }> = [
+    { title: 'AI Image', description: 'Start an image project', icon: <ImagePlus size={22} />, className: 'image', action: () => setLocation('/projects?new=image') },
+    { title: 'AI Video', description: 'Start a video project', icon: <Video size={22} />, className: 'video', action: () => setLocation('/projects?new=video') },
     { title: 'New Design', description: 'Start with a blank canvas', icon: <PenLine size={22} />, className: 'design', action: () => setLocation('/projects?new=image') },
-    { title: 'Script', description: 'Write your next story', icon: <FileText size={22} />, className: 'script' },
+    { title: 'Script', description: 'Open your projects to continue creating', icon: <FileText size={22} />, className: 'script', action: () => setLocation('/projects') },
   ];
 
   const [recentProjects, setRecentProjects] = useState<CreateoraProject[]>([]);
@@ -738,7 +738,7 @@ function DashboardPage() {
           <div className="studio-mobile-brand"><Wordmark /></div>
           <div className="studio-search">
             <span><ArrowRight size={14} /></span>
-            <input placeholder="Search projects, assets and templates" aria-label="Search workspace" />
+            <input value={workspaceSearch} onChange={(event) => setWorkspaceSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && workspaceSearch.trim()) setLocation(`/projects?search=${encodeURIComponent(workspaceSearch.trim())}`); }} placeholder="Search projects… (press Enter)" aria-label="Search projects" />
             <kbd>/</kbd>
           </div>
           <div className="studio-top-actions">
@@ -754,7 +754,7 @@ function DashboardPage() {
               <h1>Good morning, {firstName}.</h1>
               <p>What are you making today? Start from an idea or jump straight into a tool.</p>
             </div>
-            <div className="studio-date">AUG 2026 <span>•</span> {plan.toUpperCase()}</div>
+            <div className="studio-date">{new Date().toLocaleDateString(undefined, { month: 'short', year: 'numeric' }).toUpperCase()} <span>•</span> {plan.toUpperCase()}</div>
           </section>
 
           <section className="studio-hero-card">
