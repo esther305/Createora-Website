@@ -523,11 +523,12 @@ const dashboardTools = [
 ];
 
 function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
+  const [location, setLocation] = useLocation();
   const sidebarItems = [
-    { label: 'Home', icon: <LayoutDashboard size={17} /> },
-    { label: 'Projects', icon: <FolderKanban size={17} /> },
-    { label: 'Assets', icon: <FileBox size={17} /> },
-    { label: 'Templates', icon: <Layers3 size={17} /> },
+    { label: 'Home', href: '/dashboard', icon: <LayoutDashboard size={17} /> },
+    { label: 'Projects', href: '/projects', icon: <FolderKanban size={17} /> },
+    { label: 'Assets', href: '/assets', icon: <FileBox size={17} /> },
+    { label: 'Templates', href: '/dashboard#templates', icon: <Layers3 size={17} /> },
   ];
   return (
     <aside className="studio-sidebar">
@@ -544,11 +545,18 @@ function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
 
       <nav className="studio-nav" aria-label="Createora workspace">
         <span className="studio-nav-label">Workspace</span>
-        {sidebarItems.map((item, index) => (
+        {sidebarItems.map((item) => (
           <a
-            className={`studio-nav-item ${index === 0 ? 'active' : ''}`}
+            className={`studio-nav-item ${(item.label === 'Home' && location === '/dashboard') || (item.label === 'Projects' && location === '/projects') || (item.label === 'Assets' && location === '/assets') ? 'active' : ''}`}
             key={item.label}
-            href={item.label === 'Assets' ? '/assets' : index === 0 ? '#top' : `#${item.label.toLowerCase()}`}
+            href={item.href}
+            onClick={(event) => {
+              if (item.href.startsWith('/dashboard#')) {
+                event.preventDefault();
+                setLocation(item.href);
+              }
+            }}
+            aria-current={(item.label === 'Home' && location === '/dashboard') || (item.label === 'Projects' && location === '/projects') || (item.label === 'Assets' && location === '/assets') ? 'page' : undefined}
             data-testid={`link-dashboard-${item.label.toLowerCase()}`}
           >
             {item.icon}<span>{item.label}</span>
@@ -556,15 +564,15 @@ function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
         ))}
 
         <span className="studio-nav-label studio-nav-spaced">Create with AI</span>
-        <a className="studio-nav-item studio-ai-nav" href="#ai-studio">
+        <a className="studio-nav-item studio-ai-nav" href="/dashboard#ai-studio" onClick={(event) => { event.preventDefault(); setLocation('/dashboard#ai-studio'); }}>
           <span className="studio-nav-ai-icon"><Sparkles size={16} /></span>
           <span>AI Studio</span>
           <Zap size={13} />
         </a>
 
         <span className="studio-nav-label studio-nav-spaced">Account</span>
-        <a className="studio-nav-item" href="#billing"><CreditCard size={17} /><span>Billing</span></a>
-        <a className="studio-nav-item" href="#settings"><Settings size={17} /><span>Settings</span></a>
+        <span className="studio-nav-item" aria-disabled="true" title="Billing page coming soon"><CreditCard size={17} /><span>Billing · Soon</span></span>
+        <span className="studio-nav-item" aria-disabled="true" title="Settings page coming soon"><Settings size={17} /><span>Settings · Soon</span></span>
       </nav>
 
       <div className="studio-sidebar-bottom">
