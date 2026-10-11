@@ -610,7 +610,7 @@ function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('search') ?? '');
 
   const loadProjects = async () => {
     const token = await getToken();
@@ -701,6 +701,7 @@ function DashboardPage() {
   const { signOut } = useClerk();
   const [, setLocation] = useLocation();
   const profileQuery = useGetProfile({ query: { enabled: Boolean(isSignedIn), queryKey: getGetProfileQueryKey() } });
+  const [workspaceSearch, setWorkspaceSearch] = useState('');
 
   if (!isLoaded) return <main className="studio-loading">Loading your studio…</main>;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
@@ -737,7 +738,7 @@ function DashboardPage() {
           <div className="studio-mobile-brand"><Wordmark /></div>
           <div className="studio-search">
             <span><ArrowRight size={14} /></span>
-            <input placeholder="Search projects, assets and templates" aria-label="Search workspace" />
+            <input value={workspaceSearch} onChange={(event) => setWorkspaceSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && workspaceSearch.trim()) setLocation(`/projects?search=${encodeURIComponent(workspaceSearch.trim())}`); }} placeholder="Search projects… (press Enter)" aria-label="Search projects" />
             <kbd>/</kbd>
           </div>
           <div className="studio-top-actions">
