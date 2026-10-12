@@ -1851,3 +1851,54 @@ button,input,textarea,select{max-width:100%}
 .editor-element-text { box-sizing:border-box; }
 .editor-element-image img,.editor-element-video video { max-width:none; }
 
+
+
+/* Template library and account pages */
+.template-library-page,.account-page { min-height:100vh; background:#f5f6f2; color:#18221c; }
+.template-library-header { display:flex; align-items:center; gap:16px; min-height:76px; padding:16px clamp(18px,4vw,64px); border-bottom:1px solid #e0e5de; background:rgba(255,255,255,.88); }
+.template-library-header > div { display:grid; gap:3px; }
+.template-library-header > div > span { color:#718076; font-size:9px; letter-spacing:.14em; font-weight:700; }
+.template-library-header > div > strong { font-size:14px; }
+.template-back { width:34px; height:34px; display:grid; place-items:center; border:1px solid #dfe5df; border-radius:10px; background:white; color:#34453a; transform:rotate(180deg); cursor:pointer; }
+.template-divider { width:1px; height:30px; background:#e0e5de; }
+.template-account-link { margin-left:auto; display:flex; align-items:center; gap:8px; padding:10px 13px; border:1px solid #dfe5df; border-radius:10px; background:#fff; color:#283b30; font-size:12px; font-weight:700; cursor:pointer; }
+.template-library-main { width:min(1240px,100%); margin:0 auto; padding:clamp(28px,5vw,64px) clamp(18px,4vw,48px) 80px; }
+.template-library-intro { max-width:660px; }
+.template-library-intro h1,.account-page-intro h1 { margin:14px 0 16px; font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-.065em; font-weight:650; }
+.template-library-intro h1 em,.account-page-intro h1 em { color:#43825c; font-family:Georgia,serif; font-weight:500; }
+.template-library-intro p,.account-page-intro > p { max-width:540px; color:#69766c; font-size:15px; line-height:1.7; }
+.template-library-toolbar { display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap; margin:36px 0 24px; }
+.template-library-toolbar > label { display:flex; align-items:center; gap:10px; width:min(360px,100%); padding:0 14px; height:44px; background:white; border:1px solid #dfe5df; border-radius:12px; color:#7b897f; }
+.template-library-toolbar input { width:100%; min-width:0; border:0; outline:0; background:transparent; color:#18221c; font-size:13px; }
+.template-category-tabs { display:flex; gap:7px; flex-wrap:wrap; }
+.template-category-tabs button { padding:9px 13px; border:1px solid #dfe5df; border-radius:999px; background:#fff; color:#627066; font-size:12px; cursor:pointer; }
+.template-category-tabs button.active { background:#1f3427; border-color:#1f3427; color:#fff; }
+.template-library-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:22px; }
+.template-library-card { min-width:0; overflow:hidden; border:1px solid #e0e5df; border-radius:17px; background:#fff; transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease; }
+.template-library-card:hover,.template-library-card.selected { transform:translateY(-3px); border-color:#7eb08c; box-shadow:0 14px 35px rgba(31,52,39,.08); }
+.template-library-art { position:relative; width:100%; aspect-ratio:1.18; display:flex; align-items:center; justify-content:center; overflow:hidden; border:0; cursor:pointer; }
+.template-library-art.template-social { background:#f4e6d7; color:#f16c3d; }
+.template-library-art.template-promo { background:#1d2521; color:#c7f36b; }
+.template-library-art.template-reel { background:#e9e0fb; color:#7044c8; }
+.template-library-art.template-brand { background:#d9eee3; color:#236b4b; }
+.template-preview-chip { position:absolute; top:15px; left:15px; padding:6px 9px; border-radius:999px; background:rgba(255,255,255,.76); color:#34453a; font-size:9px; font-weight:700; }
+.template-preview-title { z-index:1; display:flex; flex-direction:column; font-size:clamp(28px,4vw,47px); font-weight:900; line-height:.86; letter-spacing:-.06em; text-align:center; }
+.template-preview-shape { position:absolute; right:-24px; bottom:-34px; width:46%; aspect-ratio:1; border:1px solid currentColor; border-radius:50%; opacity:.3; }
+.template-library-card-copy { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:17px; }
+.template-library-card-copy > div { min-width:0; }
+.template-library-card-copy strong { font-size:14px; }
+.template-library-card-copy p { margin:7px 0 0; color:#748076; font-size:11px; line-height:1.55; }
+.template-library-card-copy button { flex-shrink:0; display:flex; align-items:center; gap:6px; padding:9px 10px; border:0; border-radius:9px; background:#1f3427; color:#fff; font-size:10px; font-weight:700; cursor:pointer; }
+.template-library-card-copy button:disabled { opacity:.55; cursor:wait; }
+.template-loading { min-height:100vh; display:grid; place-items:center; background:#f5f6f2; color:#69766c; }
+.account-page-main { display:grid; grid-template-columns:minmax(220px,.7fr) minmax(0,1.3fr); gap:clamp(24px,5vw,70px); width:min(1240px,100%); margin:0 auto; padding:clamp(30px,5vw,64px) clamp(18px,4vw,48px) 80px; align-items:start; }
+.account-identity { display:flex; align-items:center; gap:13px; margin-top:28px; padding:16px; border:1px solid #e0e5df; border-radius:14px; background:#fff; }
+.account-identity > span { display:grid; place-items:center; width:42px; height:42px; border-radius:50%; background:#d9eee3; color:#236b4b; font-size:17px; font-weight:800; }
+.account-identity > div { display:grid; gap:5px; min-width:0; }
+.account-identity strong { overflow:hidden; text-overflow:ellipsis; font-size:13px; }
+.account-identity small { overflow:hidden; text-overflow:ellipsis; color:#718076; font-size:11px; }
+.account-profile-panel { min-width:0; padding:18px; border:1px solid #e0e5df; border-radius:18px; background:#fff; overflow:hidden; }
+.account-profile-panel .cl-rootBox { width:100%; }
+.account-profile-panel .cl-cardBox { width:100%; max-width:100%; box-shadow:none; }
+@media(max-width:900px) { .template-library-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .account-page-main { grid-template-columns:1fr; } }
+@media(max-width:560px) { .template-library-grid { grid-template-columns:1fr; } .template-library-card-copy { padding:14px; } .template-library-header { gap:10px; } .template-library-header .template-account-link { padding:9px; font-size:0; } .template-library-header .template-account-link svg { width:16px; height:16px; } .template-library-intro h1,.account-page-intro h1 { font-size:48px; } }
