@@ -18,6 +18,8 @@ import {
   CircleHelp,
   Clock3,
   CreditCard,
+  Copy,
+  ArrowDownUp,
   FileBox,
   FileText,
   FolderKanban,
@@ -618,6 +620,8 @@ function ProjectsPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('search') ?? '');
+  const [sortBy, setSortBy] = useState<'updated' | 'name' | 'created'>('updated');
+  const [busyProjectId, setBusyProjectId] = useState('');
 
   const loadProjects = async () => {
     const token = await getToken();
@@ -665,6 +669,35 @@ function ProjectsPage() {
     }
   };
 
+  const renameProject = async (project: CreateoraProject) => {
+    const name = window.prompt('Rename project', project.name)?.trim();
+    if (!name || name === project.name) return;
+    setBusyProjectId(project.id); setError('');
+    try {
+      const token = await getToken();
+      const response = await fetch(`/api/projects/${project.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ name }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to rename project');
+      setProjects((current) => current.map((item) => item.id === project.id ? data.project : item));
+    } catch (err) { setError(err instanceof Error ? err.message : 'Unable to rename project'); } finally { setBusyProjectId(''); }
+  };
+
+  const duplicateProject = async (project: CreateoraProject) => {
+    setBusyProjectId(project.id); setError('');
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Your session expired. Please sign in again.');
+      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+      const created = await fetch('/api/projects', { method: 'POST', headers, body: JSON.stringify({ name: `${project.name} copy`.slice(0, 180), type: project.type, width: project.width ?? 1080, height: project.height ?? 1080, duration: project.duration }) });
+      const createdData = await created.json();
+      if (!created.ok || !createdData.project?.id) throw new Error(createdData.error || 'Unable to duplicate project');
+      const copied = await fetch(`/api/projects/${createdData.project.id}`, { method: 'PATCH', headers, body: JSON.stringify({ document: project.document ?? { version: 1, elements: [] }, ...(project.thumbnail ? { thumbnail: project.thumbnail } : {}) }) });
+      const copiedData = await copied.json();
+      if (!copied.ok) throw new Error(copiedData.error || 'Unable to copy project design');
+      setProjects((current) => [copiedData.project, ...current]);
+    } catch (err) { setError(err instanceof Error ? err.message : 'Unable to duplicate project'); } finally { setBusyProjectId(''); }
+  };
+
   const deleteProject = async (project: CreateoraProject) => {
     if (!window.confirm(`Delete “${project.name}”? This cannot be undone.`)) return;
     try {
@@ -685,7 +718,7 @@ function ProjectsPage() {
   if (!isLoaded) return <main className="projects-loading">Opening Projects…</main>;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
 
-  const visibleProjects = projects.filter((project) => project.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const visibleProjects = projects.filter((project) => project.name.toLowerCase().includes(search.trim().toLowerCase())).sort((a, b) => sortBy === 'name' ? a.name.localeCompare(b.name) : sortBy === 'created' ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : new Date(b.updatedAt).getTime() - new Date(a.updatedAt));
 
   return (
     <main className="projects-page">
@@ -694,9 +727,9 @@ function ProjectsPage() {
         <div className="projects-hero"><div><span className="eyebrow">02 · Your work</span><h1>Everything you create,<br /><span>in one place.</span></h1><p>Projects are saved to your workspace automatically. Open a project anytime and keep editing where you left off.</p></div>
           <div className="projects-create-grid"><button className="project-create-card image" onClick={() => void createProject('image')} disabled={creating}><span><ImagePlus size={20} /></span><strong>New image</strong><small>1080 × 1080 canvas</small><ArrowUpRight size={16} /></button><button className="project-create-card video" onClick={() => void createProject('video')} disabled={creating}><span><Video size={20} /></span><strong>New video</strong><small>1920 × 1080 canvas</small><ArrowUpRight size={16} /></button></div>
         </div>
-        <div className="projects-toolbar"><div><span className="projects-count">{projects.length}</span> {projects.length === 1 ? 'project' : 'projects'}</div><label><Target size={14} /><input id="projects-search" name="projects-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search projects…" /></label></div>
+        <div className="projects-toolbar"><div><span className="projects-count">{projects.length}</span> {projects.length === 1 ? 'project' : 'projects'} · {visibleProjects.length} shown</div><div className="projects-toolbar-controls"><label><Target size={14} /><input id="projects-search" name="projects-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search projects…" /></label><label className="projects-sort-label"><ArrowDownUp size={14}/><select aria-label="Sort projects" value={sortBy} onChange={(event) => setSortBy(event.target.value as 'updated' | 'name' | 'created')}><option value="updated">Recently updated</option><option value="created">Newest created</option><option value="name">Name A–Z</option></select></label></div></div>
         {error && <div className="projects-error">{error}</div>}
-        {loading ? <div className="projects-grid">{Array.from({ length: 6 }).map((_, index) => <div className="project-card-skeleton" key={index} />)}</div> : visibleProjects.length ? <div className="projects-grid">{visibleProjects.map((project) => <article className="workspace-project-card" key={project.id}><button className={`workspace-project-art ${projectClassName(project.type)}`} onClick={() => setLocation(`/editor?project=${project.id}`)} aria-label={`Open ${project.name}`}><span>{projectTypeLabel(project.type)}</span><div className="workspace-art-shape" /></button><div className="workspace-project-meta"><button onClick={() => setLocation(`/editor?project=${project.id}`)}><strong>{project.name}</strong><small>{project.width ?? 1080} × {project.height ?? 1080} · {new Date(project.updatedAt).toLocaleDateString()}</small></button><button className="workspace-project-delete" onClick={() => void deleteProject(project)} aria-label={`Delete ${project.name}`}><Trash2 size={15} /></button></div></article>)}</div> : <div className="projects-empty"><div><FolderKanban size={22} /></div><strong>No projects yet</strong><span>Create your first image or video project above. Your work will stay saved in your workspace.</span><button onClick={() => void createProject('image')}><Plus size={14} /> Create project</button></div>}
+        {loading ? <div className="projects-grid">{Array.from({ length: 6 }).map((_, index) => <div className="project-card-skeleton" key={index} />)}</div> : visibleProjects.length ? <div className="projects-grid">{visibleProjects.map((project) => <article className="workspace-project-card" key={project.id}><button className={`workspace-project-art ${projectClassName(project.type)}`} onClick={() => setLocation(`/editor?project=${project.id}`)} aria-label={`Open ${project.name}`}><span>{projectTypeLabel(project.type)}</span><div className="workspace-art-shape" /></button><div className="workspace-project-meta"><button className="workspace-project-open" onClick={() => setLocation(`/editor?project=${project.id}`)}><strong>{project.name}</strong><small>{project.width ?? 1080} × {project.height ?? 1080} · Updated {new Date(project.updatedAt).toLocaleDateString()}</small></button><div className="workspace-project-actions"><button className="workspace-project-action" onClick={() => void renameProject(project)} disabled={busyProjectId===project.id} aria-label={`Rename ${project.name}`} title="Rename project"><PenLine size={14}/></button><button className="workspace-project-action" onClick={() => void duplicateProject(project)} disabled={busyProjectId===project.id} aria-label={`Duplicate ${project.name}`} title="Duplicate project"><Copy size={14}/></button><button className="workspace-project-delete" onClick={() => void deleteProject(project)} disabled={busyProjectId===project.id} aria-label={`Delete ${project.name}`} title="Delete project"><Trash2 size={14}/></button></div></div></article>)}</div> : <div className="projects-empty"><div><FolderKanban size={22} /></div><strong>No projects yet</strong><span>Create your first image or video project above. Your work will stay saved in your workspace.</span><button onClick={() => void createProject('image')}><Plus size={14} /> Create project</button></div>}
       </section>
     </main>
   );
