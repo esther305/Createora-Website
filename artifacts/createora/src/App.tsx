@@ -522,7 +522,7 @@ const dashboardTools = [
   { title: 'Caption Generator', description: 'Say it clearly, then adapt it for every channel.', icon: <MessageSquareText size={19} /> },
 ];
 
-function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
+function DashboardSidebar({ onLogout, credits, plan, workspaceName, accountEmail }: { onLogout: () => void; credits: number; plan: string; workspaceName: string; accountEmail: string }) {
   const [location, setLocation] = useLocation();
   const sidebarItems = [
     { label: 'Home', href: '/dashboard', icon: <LayoutDashboard size={17} /> },
@@ -577,16 +577,15 @@ function DashboardSidebar({ onLogout }: { onLogout: () => void }) {
 
       <div className="studio-sidebar-bottom">
         <div className="studio-credit-mini">
-          <div><span>AI credits</span><strong>30 left</strong></div>
-          <div className="studio-credit-track"><span /></div>
-          <small>Starter plan · <a href="#billing">Upgrade</a></small>
+          <div><span>AI credits</span><strong>{credits} left</strong></div>
+          <small>{plan} plan · Plan details coming soon</small>
         </div>
         <a className="studio-help" href="mailto:hello@createora.co"><CircleHelp size={16} /> Help center</a>
-        <button className="studio-user-row" data-testid="button-dashboard-profile">
-          <span className="studio-user-avatar">K</span>
-          <span><strong>My workspace</strong><small>Personal</small></span>
+        <div className="studio-user-row" data-testid="button-dashboard-profile" title={accountEmail || workspaceName}>
+          <span className="studio-user-avatar">{workspaceName.trim().charAt(0).toUpperCase() || 'C'}</span>
+          <span><strong>{workspaceName}</strong><small>{accountEmail || 'Personal workspace'}</small></span>
           <MoreHorizontal size={16} />
-        </button>
+        </div>
         <button className="studio-logout" onClick={onLogout} data-testid="button-dashboard-logout">
           <LogOut size={15} /> Log out
         </button>
@@ -739,7 +738,7 @@ function DashboardPage() {
 
   return (
     <main className="studio-shell">
-      <DashboardSidebar onLogout={() => signOut({ redirectUrl: basePath || '/' })} />
+      <DashboardSidebar onLogout={() => signOut({ redirectUrl: basePath || '/' })} credits={credits} plan={plan} workspaceName={user?.fullName || user?.username || 'My workspace'} accountEmail={user?.primaryEmailAddress?.emailAddress || ''} />
 
       <section className="studio-main">
         <header className="studio-topbar">
