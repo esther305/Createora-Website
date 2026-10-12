@@ -1902,3 +1902,22 @@ button,input,textarea,select{max-width:100%}
 .account-profile-panel .cl-cardBox { width:100%; max-width:100%; box-shadow:none; }
 @media(max-width:900px) { .template-library-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .account-page-main { grid-template-columns:1fr; } }
 @media(max-width:560px) { .template-library-grid { grid-template-columns:1fr; } .template-library-card-copy { padding:14px; } .template-library-header { gap:10px; } .template-library-header .template-account-link { padding:9px; font-size:0; } .template-library-header .template-account-link svg { width:16px; height:16px; } .template-library-intro h1,.account-page-intro h1 { font-size:48px; } }
+
+
+/* Project management controls */
+.projects-toolbar{gap:16px}
+.projects-visible-count{color:#9aa69c;font-size:11px}
+.projects-toolbar-controls{display:flex;align-items:center;gap:10px}
+.projects-toolbar-controls label:focus-within{border-color:#7da58a;box-shadow:0 0 0 3px rgba(62,139,87,.09)}
+.projects-sort-label{width:auto!important;min-width:172px}
+.projects-sort-label select{border:0;outline:0;background:transparent;width:100%;font:inherit;color:#334138;cursor:pointer}
+.workspace-project-meta{gap:10px;padding:14px}
+.workspace-project-meta .workspace-project-open{border:0;background:transparent;text-align:left;padding:0;cursor:pointer;min-width:0;flex:1}
+.workspace-project-meta .workspace-project-open strong,.workspace-project-meta .workspace-project-open small{display:block}
+.workspace-project-meta .workspace-project-open strong{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#17221b}
+.workspace-project-meta .workspace-project-open small{margin-top:5px;color:#7a877e;font-size:10px}
+.workspace-project-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.workspace-project-action{border:0;background:#f5f7f5;color:#65736a;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;cursor:pointer;transition:background .16s ease,color .16s ease}
+.workspace-project-action:hover{background:#edf7ef;color:#247346}
+.workspace-project-action:disabled,.workspace-project-delete:disabled{opacity:.45;cursor:wait}
+@media(max-width:620px){.projects-toolbar-controls{flex-direction:column;align-items:stretch}.projects-toolbar-controls label{width:auto}.projects-sort-label{min-width:0}.workspace-project-meta{align-items:flex-start}.workspace-project-actions{gap:3px}.workspace-project-action,.workspace-project-delete{width:28px;height:28px}}
