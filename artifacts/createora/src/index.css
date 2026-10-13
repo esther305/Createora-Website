@@ -1938,3 +1938,9 @@ button,input,textarea,select{max-width:100%}
 .editor-video-controls input[type="range"]{accent-color:#42b876}
 .timeline-clip{touch-action:manipulation}
 @media(max-width:760px){.editor-video-controls .inspector-control-stack>label{font-size:10px}.editor-video-controls .inspector-note{font-size:10px}}
+
+
+/* Timeline clips can be repositioned with native drag and drop. */
+.timeline-clip { cursor: grab; touch-action: pan-y; }
+.timeline-clip:active { cursor: grabbing; }
+.timeline-track { position: relative; }

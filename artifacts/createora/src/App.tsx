@@ -2058,14 +2058,44 @@ function CreateoraEditor() {
                     <div className="timeline-track-label"><span className="timeline-audio-dot" /><span>Audio</span></div>
                   </div>
                   <div className="timeline-tracks">
-                    <div className="timeline-track">
+                    <div
+                      className="timeline-track"
+                      onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const clipId = event.dataTransfer.getData('text/plain');
+                        const clip = videoElements.find((item) => item.id === clipId);
+                        if (!clip) return;
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+                        const duration = clip.duration ?? 5;
+                        const nextStart = Math.max(0, Math.min(timelineDuration - duration, ratio * timelineDuration));
+                        setClipTime(clip.id, { startTime: Number(nextStart.toFixed(2)) });
+                        setSelectedId(clip.id);
+                        setCurrentTime(nextStart);
+                      }}
+                    >
                       {videoElements.length ? videoElements.map((clip, index) => {
                         const start = clip.startTime ?? index * 5;
                         const duration = clip.duration ?? 5;
                         const left = (start / timelineDuration) * 100;
                         const width = Math.max(5, (duration / timelineDuration) * 100);
                         return (
-                          <button key={clip.id} className={selectedId === clip.id ? 'timeline-clip selected' : 'timeline-clip'} style={{ left: left + '%', width: width + '%' }} onClick={(event) => { event.stopPropagation(); setSelectedId(clip.id); setTool('select'); }}>
+                          <button
+                            key={clip.id}
+                            draggable
+                            title="Drag to reposition this clip on the timeline"
+                            className={selectedId === clip.id ? 'timeline-clip selected' : 'timeline-clip'}
+                            style={{ left: left + '%', width: width + '%' }}
+                            onDragStart={(event) => {
+                              event.dataTransfer.setData('text/plain', clip.id);
+                              event.dataTransfer.effectAllowed = 'move';
+                              setSelectedId(clip.id);
+                              setTool('select');
+                            }}
+                            onClick={(event) => { event.stopPropagation(); setSelectedId(clip.id); setTool('select'); }}
+                          >
                             <span className="timeline-clip-film" />
                             <strong>Clip {index + 1}</strong>
                             <small>{duration.toFixed(1)}s</small>
