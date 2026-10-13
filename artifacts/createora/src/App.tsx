@@ -1446,7 +1446,9 @@ function CreateoraEditor() {
           const asset = await uploadAssetDirect(file, token, {
             width: sourceWidth,
             height: sourceHeight,
-            duration: sourceDuration,
+            // The assets table stores duration as an integer number of seconds.
+            // Keep fractional precision on the editor clip, but send an integer to the API.
+            duration: Math.round(sourceDuration),
           });
           const trimEnd = Math.max(0.25, sourceDuration);
           addElement({
