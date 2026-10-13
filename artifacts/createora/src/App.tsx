@@ -1089,6 +1089,7 @@ function CreateoraEditor() {
   const [projectId, setProjectId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('project'));
   const [projectReady, setProjectReady] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error'>('saved');
+  const [saveRetryCount, setSaveRetryCount] = useState(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
@@ -1231,7 +1232,7 @@ function CreateoraEditor() {
       })();
     }, 650);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [elements, projectName, projectId, projectReady, canvasWidth, canvasHeight, canvasBackground, hiddenLayers, lockedLayers, layerNames]);
+  }, [elements, projectName, projectId, projectReady, canvasWidth, canvasHeight, canvasBackground, hiddenLayers, lockedLayers, layerNames, saveRetryCount]);
 
 
 
@@ -1814,12 +1815,12 @@ function CreateoraEditor() {
           <button className="editor-back" onClick={() => setLocation('/dashboard')}><ArrowRight size={17} /></button>
           <Wordmark />
           <span className="editor-divider" />
-          <div className="editor-project-name"><strong>{projectName}</strong><small>{projectReady ? 'Saved to workspace' : 'Creating project…'}</small></div>
+          <button className="editor-project-name editor-project-name-button" onClick={() => { const nextName = window.prompt('Rename design', projectName)?.trim(); if (nextName && nextName !== projectName) setProjectName(nextName.slice(0, 180)); }} title="Click to rename design"><strong>{projectName}</strong><small>{projectReady ? 'Click to rename design' : 'Creating project…'}</small></button>
         </div>
         <div className="editor-top-center">
           <button onClick={undo} disabled={!history.length} aria-label="Undo"><Undo2 size={16} /></button>
           <button onClick={redo} disabled={!future.length} aria-label="Redo"><Redo2 size={16} /></button>
-          <span className={"editor-save-dot save-status-" + saveStatus} /> <span aria-live="polite">{saveStatus === "saving" ? "Saving…" : saveStatus === "error" ? "Save failed" : "Saved"}</span>
+          <span className={"editor-save-dot save-status-" + saveStatus} /> {saveStatus === "error" ? <button className="editor-save-retry" onClick={() => setSaveRetryCount((count) => count + 1)} aria-live="polite" title="Retry saving this design">Save failed · Retry</button> : <span aria-live="polite">{saveStatus === "saving" ? "Saving…" : "Saved"}</span>}
         </div>
         <div className="editor-top-right">
           <button className="editor-icon-action"><Share2 size={16} /> Share</button>
