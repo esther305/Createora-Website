@@ -1931,3 +1931,16 @@ button,input,textarea,select{max-width:100%}
 .editor-save-retry{border:0;padding:2px 5px;border-radius:5px;background:rgba(227,108,105,.12);color:#ff9b96;font:inherit;cursor:pointer}
 .editor-save-retry:hover,.editor-save-retry:focus-visible{background:rgba(227,108,105,.22);outline:1px solid rgba(255,155,150,.45)}
 @media(max-width:650px){.editor-project-name-button{display:grid;max-width:92px}.editor-project-name-button strong,.editor-project-name-button small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+
+
+/* Video editing import and trim controls */
+.editor-video-controls .inspector-section-title small{color:#8ea295;font-size:9px}
+.editor-video-controls input[type="range"]{accent-color:#42b876}
+.timeline-clip{touch-action:manipulation}
+@media(max-width:760px){.editor-video-controls .inspector-control-stack>label{font-size:10px}.editor-video-controls .inspector-note{font-size:10px}}
+
+
+/* Timeline clips can be repositioned with native drag and drop. */
+.timeline-clip { cursor: grab; touch-action: pan-y; }
+.timeline-clip:active { cursor: grabbing; }
+.timeline-track { position: relative; }

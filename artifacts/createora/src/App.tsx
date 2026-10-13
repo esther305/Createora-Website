@@ -1009,6 +1009,7 @@ type EditorElement = {
   rotation: number;
   startTime?: number;
   duration?: number;
+  sourceDuration?: number;
   trimStart?: number;
   trimEnd?: number;
   speed?: number;
@@ -1078,6 +1079,7 @@ function CreateoraEditor() {
   const [history, setHistory] = useState<EditorElement[][]>([]);
   const [future, setFuture] = useState<EditorElement[][]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const videoPreviewRefs = useRef<Record<string, HTMLVideoElement | null>>({});
   const canvasWrapRef = useRef<HTMLDivElement>(null);
   const textEditSnapshotRef = useRef<EditorElement[] | null>(null);
   const dragRef = useRef<{
@@ -1209,6 +1211,27 @@ function CreateoraEditor() {
   useEffect(() => {
     if (currentTime > timelineDuration) setCurrentTime(timelineDuration);
   }, [currentTime, timelineDuration]);
+
+  // Keep the visible video preview aligned with the timeline playhead.
+  useEffect(() => {
+    for (const clip of elements.filter((element) => element.type === 'video')) {
+      const preview = videoPreviewRefs.current[clip.id];
+      if (!preview || !clip.src) continue;
+      const clipStart = clip.startTime ?? 0;
+      const clipEnd = clipStart + (clip.duration ?? 5);
+      const isActive = currentTime >= clipStart && currentTime < clipEnd;
+      const sourceTime = Math.max(clip.trimStart ?? 0, (clip.trimStart ?? 0) + currentTime - clipStart);
+      if (Math.abs(preview.currentTime - sourceTime) > (isPlaying ? 0.8 : 0.05)) {
+        try { preview.currentTime = Math.min(sourceTime, Math.max(0, (clip.sourceDuration ?? preview.duration ?? sourceTime) - 0.05)); } catch { /* Metadata may not be ready yet. */ }
+      }
+      preview.volume = Math.max(0, Math.min(1, clip.volume ?? 1));
+      if (isPlaying && isActive) {
+        if (preview.paused) void preview.play().catch(() => undefined);
+      } else if (!preview.paused) {
+        preview.pause();
+      }
+    }
+  }, [currentTime, isPlaying, elements]);
 
   useEffect(() => {
     if (!projectReady || !projectId) return;
@@ -1397,48 +1420,83 @@ function CreateoraEditor() {
     if (!file) return;
 
     try {
-      if (!file.type.startsWith('image/')) {
-        throw new Error('The editor currently accepts image files only.');
+      const isVideo = file.type.startsWith('video/');
+      if (!file.type.startsWith('image/') && !isVideo) {
+        throw new Error('Choose an image or a supported video file (MP4, WebM, or MOV).');
       }
 
       const token = await getToken();
-      if (!token) {
-        throw new Error('Your session expired. Please sign in again.');
-      }
+      if (!token) throw new Error('Your session expired. Please sign in again.');
 
-      const image = new Image();
       const objectUrl = URL.createObjectURL(file);
-
       try {
-        image.src = objectUrl;
-
-        await new Promise<void>((resolve, reject) => {
-          image.onload = () => resolve();
-          image.onerror = () => reject(new Error('Unable to read uploaded image'));
-        });
-
-        const asset = await uploadAssetDirect(file, token, {
-          width: image.naturalWidth || null,
-          height: image.naturalHeight || null,
-        });
-
-        addElement({
-          id: crypto.randomUUID(),
-          type: 'image',
-          x: 180,
-          y: 140,
-          width: 420,
-          height: 300,
-          rotation: 0,
-          src: asset.url,
-        });
+        if (isVideo) {
+          const video = document.createElement('video');
+          video.preload = 'metadata';
+          video.src = objectUrl;
+          await new Promise<void>((resolve, reject) => {
+            video.onloadedmetadata = () => resolve();
+            video.onerror = () => reject(new Error('Unable to read this video. Try an MP4 or WebM file.'));
+          });
+          const sourceDuration = Number.isFinite(video.duration) ? video.duration : 5;
+          const sourceWidth = video.videoWidth || 1920;
+          const sourceHeight = video.videoHeight || 1080;
+          const frameWidth = Math.min(canvasWidth * 0.78, 620);
+          const frameHeight = frameWidth * sourceHeight / Math.max(1, sourceWidth);
+          const asset = await uploadAssetDirect(file, token, {
+            width: sourceWidth,
+            height: sourceHeight,
+            // The assets table stores duration as an integer number of seconds.
+            // Keep fractional precision on the editor clip, but send an integer to the API.
+            duration: Math.round(sourceDuration),
+          });
+          const trimEnd = Math.max(0.25, sourceDuration);
+          addElement({
+            id: crypto.randomUUID(),
+            type: 'video',
+            x: Math.max(0, (canvasWidth - frameWidth) / 2),
+            y: Math.max(0, (canvasHeight - Math.min(frameHeight, canvasHeight * 0.78)) / 2),
+            width: frameWidth,
+            height: Math.min(frameHeight, canvasHeight * 0.78),
+            rotation: 0,
+            src: asset.url,
+            sourceDuration,
+            trimStart: 0,
+            trimEnd,
+            duration: trimEnd,
+            startTime: currentTime,
+            volume: 1,
+            fit: 'contain',
+          });
+          setTimelineOpen(true);
+          setCurrentTime(Math.max(0, currentTime));
+        } else {
+          const image = new Image();
+          image.src = objectUrl;
+          await new Promise<void>((resolve, reject) => {
+            image.onload = () => resolve();
+            image.onerror = () => reject(new Error('Unable to read uploaded image'));
+          });
+          const asset = await uploadAssetDirect(file, token, {
+            width: image.naturalWidth || null,
+            height: image.naturalHeight || null,
+          });
+          addElement({
+            id: crypto.randomUUID(),
+            type: 'image',
+            x: 180,
+            y: 140,
+            width: 420,
+            height: 300,
+            rotation: 0,
+            src: asset.url,
+          });
+        }
       } finally {
         URL.revokeObjectURL(objectUrl);
       }
     } catch (error) {
-      window.alert(
-        error instanceof Error ? error.message : 'Unable to upload image',
-      );
+      window.alert(error instanceof Error ? error.message : 'Unable to upload media');
     } finally {
       event.target.value = '';
     }
@@ -1476,6 +1534,7 @@ function CreateoraEditor() {
       startTime: start + splitAt,
       duration: duration - splitAt,
       trimStart: (selectedVideo.trimStart ?? 0) + splitAt,
+      trimEnd: selectedVideo.trimEnd ?? selectedVideo.sourceDuration ?? duration,
     };
     commit(elements.map((element) => element.id === selectedVideo.id ? first : element).concat(second));
     setSelectedId(second.id);
@@ -1932,7 +1991,7 @@ function CreateoraEditor() {
                 >
                   {element.type === 'text' && <span>{element.text}</span>}
                   {element.type === 'image' && element.src && <img src={element.src} alt="" draggable={false} style={{ objectFit: element.fit ?? "cover", objectPosition: (element.cropX ?? 50) + "% " + (element.cropY ?? 50) + "%", borderRadius: ((element.borderRadius ?? 4) * zoom / 100) + "px", filter: "brightness(" + (element.brightness ?? 100) + "%) contrast(" + (element.contrast ?? 100) + "%) saturate(" + (element.saturation ?? 100) + "%) grayscale(" + (element.grayscale ?? 0) + "%) blur(" + ((element.blur ?? 0) * zoom / 100) + "px)" }} />}
-                  {element.type === 'video' && element.src && <video src={element.src} muted playsInline preload="metadata" draggable={false} style={{ objectFit: element.fit ?? "cover", objectPosition: (element.cropX ?? 50) + "% " + (element.cropY ?? 50) + "%", borderRadius: ((element.borderRadius ?? 4) * zoom / 100) + "px", filter: "brightness(" + (element.brightness ?? 100) + "%) contrast(" + (element.contrast ?? 100) + "%) saturate(" + (element.saturation ?? 100) + "%) grayscale(" + (element.grayscale ?? 0) + "%) blur(" + ((element.blur ?? 0) * zoom / 100) + "px)" }} />}
+                  {element.type === 'video' && element.src && <video ref={(node) => { videoPreviewRefs.current[element.id] = node; }} src={element.src} playsInline preload="metadata" draggable={false} style={{ objectFit: element.fit ?? "cover", objectPosition: (element.cropX ?? 50) + "% " + (element.cropY ?? 50) + "%", borderRadius: ((element.borderRadius ?? 4) * zoom / 100) + "px", filter: "brightness(" + (element.brightness ?? 100) + "%) contrast(" + (element.contrast ?? 100) + "%) saturate(" + (element.saturation ?? 100) + "%) grayscale(" + (element.grayscale ?? 0) + "%) blur(" + ((element.blur ?? 0) * zoom / 100) + "px)" }} />}
                   {selectedId === element.id && <span className="editor-selection-label">{element.type.toUpperCase()}</span>}
                   {selectedId === element.id && tool === "select" && !lockedLayers.has(element.id) && ["nw", "n", "ne", "e", "se", "s", "sw", "w"].map((handle) => <button type="button" key={handle} className={"editor-transform-handle handle-" + handle} aria-label={"Resize " + element.type + " " + handle} onPointerDown={(event) => startResize(event, element, handle)} />)}
                 </div>
@@ -1999,14 +2058,44 @@ function CreateoraEditor() {
                     <div className="timeline-track-label"><span className="timeline-audio-dot" /><span>Audio</span></div>
                   </div>
                   <div className="timeline-tracks">
-                    <div className="timeline-track">
+                    <div
+                      className="timeline-track"
+                      onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const clipId = event.dataTransfer.getData('text/plain');
+                        const clip = videoElements.find((item) => item.id === clipId);
+                        if (!clip) return;
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+                        const duration = clip.duration ?? 5;
+                        const nextStart = Math.max(0, Math.min(timelineDuration - duration, ratio * timelineDuration));
+                        setClipTime(clip.id, { startTime: Number(nextStart.toFixed(2)) });
+                        setSelectedId(clip.id);
+                        setCurrentTime(nextStart);
+                      }}
+                    >
                       {videoElements.length ? videoElements.map((clip, index) => {
                         const start = clip.startTime ?? index * 5;
                         const duration = clip.duration ?? 5;
                         const left = (start / timelineDuration) * 100;
                         const width = Math.max(5, (duration / timelineDuration) * 100);
                         return (
-                          <button key={clip.id} className={selectedId === clip.id ? 'timeline-clip selected' : 'timeline-clip'} style={{ left: left + '%', width: width + '%' }} onClick={(event) => { event.stopPropagation(); setSelectedId(clip.id); setTool('select'); }}>
+                          <button
+                            key={clip.id}
+                            draggable
+                            title="Drag to reposition this clip on the timeline"
+                            className={selectedId === clip.id ? 'timeline-clip selected' : 'timeline-clip'}
+                            style={{ left: left + '%', width: width + '%' }}
+                            onDragStart={(event) => {
+                              event.dataTransfer.setData('text/plain', clip.id);
+                              event.dataTransfer.effectAllowed = 'move';
+                              setSelectedId(clip.id);
+                              setTool('select');
+                            }}
+                            onClick={(event) => { event.stopPropagation(); setSelectedId(clip.id); setTool('select'); }}
+                          >
                             <span className="timeline-clip-film" />
                             <strong>Clip {index + 1}</strong>
                             <small>{duration.toFixed(1)}s</small>
@@ -2118,6 +2207,25 @@ function CreateoraEditor() {
                     </div>
                   </div>}
 
+                  {selectedVideo && <div className="inspector-section editor-video-controls">
+                    <div className="inspector-section-title"><span>Video clip</span><small>{(selectedVideo.duration ?? 0).toFixed(1)}s on timeline</small></div>
+                    <div className="inspector-control-stack">
+                      <label>Timeline start · {(selectedVideo.startTime ?? 0).toFixed(1)}s
+                        <input type="range" min="0" max={Math.max(0, timelineDuration - 0.25)} step="0.1" value={Math.min(selectedVideo.startTime ?? 0, Math.max(0, timelineDuration - 0.25))} onChange={(event) => setClipTime(selectedVideo.id, { startTime: Number(event.target.value) })} />
+                      </label>
+                      <label>Trim start · {(selectedVideo.trimStart ?? 0).toFixed(1)}s
+                        <input type="range" min="0" max={Math.max(0, (selectedVideo.trimEnd ?? selectedVideo.sourceDuration ?? 5) - 0.25)} step="0.1" value={selectedVideo.trimStart ?? 0} onChange={(event) => { const trimStart = Number(event.target.value); const trimEnd = selectedVideo.trimEnd ?? selectedVideo.sourceDuration ?? 5; setClipTime(selectedVideo.id, { trimStart, duration: Math.max(0.25, trimEnd - trimStart) }); }} />
+                      </label>
+                      <label>Trim end · {(selectedVideo.trimEnd ?? selectedVideo.sourceDuration ?? selectedVideo.duration ?? 5).toFixed(1)}s
+                        <input type="range" min={(selectedVideo.trimStart ?? 0) + 0.25} max={Math.max((selectedVideo.trimStart ?? 0) + 0.25, selectedVideo.sourceDuration ?? selectedVideo.duration ?? 5)} step="0.1" value={Math.min(selectedVideo.trimEnd ?? selectedVideo.sourceDuration ?? selectedVideo.duration ?? 5, selectedVideo.sourceDuration ?? selectedVideo.duration ?? 5)} onChange={(event) => { const trimEnd = Number(event.target.value); setClipTime(selectedVideo.id, { trimEnd, duration: Math.max(0.25, trimEnd - (selectedVideo.trimStart ?? 0)) }); }} />
+                      </label>
+                      <label>Clip volume · {Math.round((selectedVideo.volume ?? 1) * 100)}%
+                        <input type="range" min="0" max="1" step="0.05" value={selectedVideo.volume ?? 1} onChange={(event) => setClipTime(selectedVideo.id, { volume: Number(event.target.value) })} />
+                      </label>
+                      <div className="inspector-note">Trim controls change the clip’s timeline range. Use Split at the playhead for a separate clip segment.</div>
+                    </div>
+                  </div>}
+
                   {selectedMedia && <div className="inspector-section">
                     <label>Frame styling</label>
                     <div className="inspector-control-stack">
@@ -2216,7 +2324,7 @@ function CreateoraEditor() {
             </>
           )}
         </aside>   </div>
-      <input id="editor-upload" name="editor-upload" ref={fileRef} type="file" accept="image/*" hidden onChange={onUpload} />
+      <input id="editor-upload" name="editor-upload" ref={fileRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" hidden onChange={onUpload} />
     </main>
   );
 }
