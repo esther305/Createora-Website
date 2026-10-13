@@ -1921,3 +1921,13 @@ button,input,textarea,select{max-width:100%}
 .workspace-project-action:hover{background:#edf7ef;color:#247346}
 .workspace-project-action:disabled,.workspace-project-delete:disabled{opacity:.45;cursor:wait}
 @media(max-width:620px){.projects-toolbar-controls{flex-direction:column;align-items:stretch}.projects-toolbar-controls label{width:auto}.projects-sort-label{min-width:0}.workspace-project-meta{align-items:flex-start}.workspace-project-actions{gap:3px}.workspace-project-action,.workspace-project-delete{width:28px;height:28px}}
+
+
+/* Editor title editing and autosave recovery */
+.editor-project-name-button{border:0;padding:4px 6px;margin:-4px -6px;text-align:left;background:transparent;color:inherit;cursor:pointer;border-radius:6px;min-width:0}
+.editor-project-name-button:hover,.editor-project-name-button:focus-visible{background:rgba(255,255,255,.06);outline:none}
+.editor-project-name-button small{transition:color .16s ease}
+.editor-project-name-button:hover small,.editor-project-name-button:focus-visible small{color:#a6d6b6}
+.editor-save-retry{border:0;padding:2px 5px;border-radius:5px;background:rgba(227,108,105,.12);color:#ff9b96;font:inherit;cursor:pointer}
+.editor-save-retry:hover,.editor-save-retry:focus-visible{background:rgba(227,108,105,.22);outline:1px solid rgba(255,155,150,.45)}
+@media(max-width:650px){.editor-project-name-button{display:grid;max-width:92px}.editor-project-name-button strong,.editor-project-name-button small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
